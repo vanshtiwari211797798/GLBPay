@@ -583,7 +583,7 @@ HomeRouter.post('/renuwal-saving', async (req, res) => {
     }
 })
 
-//fetch all renuwal list
+//fetch all renuwal list add
 HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
     try {
         const getc_all_renuwal_lists = await newRenuwalSavingModel.find();
