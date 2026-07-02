@@ -564,7 +564,7 @@ HomeRouter.get('/fetch-accounts/:accountno', async (req, res) => {
 })
 
 
-// deposit saving account balence
+// deposit saving account balence updated
 HomeRouter.post('/renuwal-saving', async (req, res) => {
     try {
         const { accountno, holdername, phone, branch, deposit_amount, deposit_by } = req.body;
@@ -576,7 +576,7 @@ HomeRouter.post('/renuwal-saving', async (req, res) => {
         const newRenuwalSaving = new newRenuwalSavingModel({ accountno, holdername, phone, branch, deposit_amount, deposit_by });
         await newRenuwalSaving.save();
 
-        return res.status(201).json({ msg: 'Renuwal Saving Successfully !' });
+        return res.status(201).json({ msg: 'Renuwal Saving Successfully!' });
 
     } catch (error) {
         console.error(`Error from renuwal saving accounts and error is the ${error}`)
