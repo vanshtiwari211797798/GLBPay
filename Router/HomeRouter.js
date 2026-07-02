@@ -622,6 +622,29 @@ HomeRouter.delete('/delete-saving-account/:id', async (req, res) => {
         console.error(`Error from deleting the saving account list and error is the ${error}`);
     }
 })
+
+
+//delete renuwal saving lists api 
+HomeRouter.delete('/delete-renuwal-saving/:id', async (_, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(401).json({ msg: "Id not receive from the query paramiters" })
+        }
+
+        const delete_renuwal_saving_acc = await newRenuwalSavingModel.findByIdAndDelete(id);
+
+        if (!delete_renuwal_saving_acc) {
+            return res.status(404).json({ msg: "Invalid id received from teh quary paramiters" })
+        }
+
+        return res.status(200).json({ msg: "Renuwal Data Deleted Successfully" });
+
+    } catch (error) {
+        console.error(`Error from  deleting renuwal saving api and error is the ${error}`)
+    }
+})
 module.exports = HomeRouter;
 
 
