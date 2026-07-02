@@ -574,6 +574,7 @@ HomeRouter.post('/renuwal-saving', async (req, res) => {
         }
 
         const newRenuwalSaving = new newRenuwalSavingModel({ accountno, holdername, phone, branch, deposit_amount, deposit_by });
+        await newRenuwalSaving.save();
 
         return res.status(201).json({ msg: 'Renuwal Saving Successfully !' });
 
