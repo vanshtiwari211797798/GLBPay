@@ -600,7 +600,7 @@ HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
 })
 
 
-//Delete the saving account list
+//Delete the saving account list 
 HomeRouter.delete('/delete-saving-account/:id', async (req, res) => {
     try {
         const id = req.params.id;
