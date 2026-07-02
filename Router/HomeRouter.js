@@ -625,7 +625,7 @@ HomeRouter.delete('/delete-saving-account/:id', async (req, res) => {
 
 
 //delete renuwal saving lists api 
-HomeRouter.delete('/delete-renuwal-saving/:id', async (_, res) => {
+HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
