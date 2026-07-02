@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const RenuwalSavingSchema = new mongoose.Schema({
     accountno: {
-        type: String,
+        type: Number,
         required: true
     },
     holdername: {
