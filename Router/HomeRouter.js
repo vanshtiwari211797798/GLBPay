@@ -599,6 +599,29 @@ HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
     }
 })
 
+
+//Delete the saving account list
+HomeRouter.delete('/delete-saving-account/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        if (!id) {
+            return res.status(401).json({ msg: "Id is required !" });
+
+        }
+
+        //delete query fpor deleting the saving account lists
+        const delete_account = await SavingModel.findByIdAndDelete(id);
+
+        if (!delete_account) {
+            return res.status(404).json({ msg: 'Somethings went wrong !' })
+        }
+
+        return res.status(200).json({ msg: "Saving account deleted successfully !" });
+    } catch (error) {
+        console.error(`Error from deleting the saving account list and error is the ${error}`);
+    }
+})
 module.exports = HomeRouter;
 
 
