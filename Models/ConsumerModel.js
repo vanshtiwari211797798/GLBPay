@@ -104,6 +104,8 @@ const consumerSchema = new mongoose.Schema({
         type: String,
         required: true
     }
+},{
+    timestamps:true
 })
 
 const ConsumerModel = new mongoose.model("consumers", consumerSchema);

@@ -21,6 +21,8 @@ const AgentSchema = new mongoose.Schema({
         type: Number,
         required: true
     }
+},{
+    timestamps:true
 })
 
 const AgentModel = new mongoose.model("agents", AgentSchema);

@@ -11,7 +11,7 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 const SavingModel = require('../Models/SavingModel');
 const AgentModel = require('../Models/AgentModel');
-
+const newRenuwalSavingModel = require('../Models/RenuwalSaving')
 
 
 //consumer image upload route
@@ -541,7 +541,7 @@ HomeRouter.get('/fetch-agent/:agent_code', async (req, res) => {
 
 
 //fetch the holder phone and branch name based on the account number  
-HomeRouter.get('/fetch-accounts/:accountno', async (req, res) => { 
+HomeRouter.get('/fetch-accounts/:accountno', async (req, res) => {
     try {
         const { accountno } = req.params;
 
@@ -560,6 +560,25 @@ HomeRouter.get('/fetch-accounts/:accountno', async (req, res) => {
 
     } catch (error) {
         console.error(`Error from fetching the account no and error is the ${error}`);
+    }
+})
+
+
+// deposit saving account balence
+HomeRouter.post('/renuwal-saving', async (req, res) => {
+    try {
+        const { accountno, holdername, phone, branch, deposit_amount, deposit_by } = req.body;
+
+        if (!accountno || !holdername || !phone || !branch || !deposit_amount || !deposit_by) {
+            return res.status(401).json({ msg: "All fields is required !" });
+        }
+
+        const newRenuwalSaving = new newRenuwalSavingModel({ accountno, holdername, phone, branch, deposit_amount, deposit_by });
+
+        return res.status(201).json({ msg: 'Renuwal Saving Successfully !' });
+
+    } catch (error) {
+        console.error(`Error from renuwal saving accounts and error is the ${error}`)
     }
 })
 
