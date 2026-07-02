@@ -647,41 +647,7 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
 })
 
 
-//update consumer list api
-HomeRouter.put('/update-consumer-list', async (req, res) => {
-    try {
-        const { id, ...updateData } = req.body;
-
-        if (!id) {
-            return res.status(400).json({ success: false, msg: "Consumer ID is required to update!" });
-        }
-
-        // Check if password is being updated, encrypt it before saving
-        if (updateData.password) {
-            const saltRound = 10;
-            updateData.password = await bcryptjs.hash(updateData.password, saltRound);
-        }
-
-        // Find consumer by ID and update with payload values
-        const updatedConsumer = await ConsumerModel.findByIdAndUpdate(
-            id,
-            { $set: updateData },
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedConsumer) {
-            return res.status(404).json({ success: false, msg: "Consumer not found with the provided ID!" });
-        }
-
-        return res.status(200).json({
-            success: true,
-            msg: "Consumer updated successfully!",
-            data: updatedConsumer
-        });
-
-    } catch (error) {
-        console.error(`Error from update the consumer and error is the ${error}`);
-        return res.status(500).json({ success: false, msg: "Server Error", error: error.message });
-    }
-})
 module.exports = HomeRouter;
+
+
+
