@@ -583,6 +583,22 @@ HomeRouter.post('/renuwal-saving', async (req, res) => {
     }
 })
 
+//fetch all renuwal list
+HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
+    try {
+        const getc_all_renuwal_lists = await newRenuwalSavingModel.find();
+
+        if (!getc_all_renuwal_lists) {
+            return res.status(404).json({ msg: "All fields is requireed !" });
+        }
+
+        return res.status(200).json({ msg: "Data fetched successfully !", data: getc_all_renuwal_lists });
+
+    } catch (error) {
+        console.error(`Error from getting renuwal listing and error is the ${error}`)
+    }
+})
+
 module.exports = HomeRouter;
 
 
