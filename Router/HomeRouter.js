@@ -600,6 +600,68 @@ HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
 })
 
 
+// ✅ Fetch single consumer by ID
+HomeRouter.get('/get-consumer/:id', async (req, res) => {
+    try {
+        const consumer = await ConsumerModel.findById(req.params.id);
+        if (!consumer) return res.status(404).json({ msg: "Consumer not found" });
+        return res.status(200).json({ msg: "Consumer fetched successfully!", data: consumer });
+    } catch (error) {
+        console.error("Get consumer error:", error);
+        return res.status(500).json({ msg: "Server error" });
+    }
+});
+
+// ✅ Update consumer by ID
+HomeRouter.put('/update-consumer/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = {
+            name: req.body.name,
+            father: req.body.father,
+            dob: req.body.dob,
+            age: req.body.age,
+            gender: req.body.gender,
+            merital: req.body.merital,
+            phone: req.body.phone,
+            email: req.body.email,
+            aadhar: req.body.aadhar,
+            pan: req.body.pan,
+            nationality: req.body.nationality,
+            present_address: req.body.present_address,
+            city: req.body.city,
+            state: req.body.state,
+            pincode: req.body.pincode,
+            bank: req.body.bank,
+            accountholder: req.body.accountholder,
+            accountno: req.body.accountno,
+            ifsc: req.body.ifsc,
+            branch: req.body.branch,
+            doa: req.body.doa,
+            nos: req.body.nos,
+            share_value: req.body.share_value,
+        };
+
+        // Photo update if uploaded
+        if (req.file) {
+            updateData.photo = req.file.path;
+        }
+
+        const updated = await ConsumerModel.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true }
+        );
+
+        if (!updated) return res.status(404).json({ msg: "Consumer not found" });
+
+        return res.status(200).json({ msg: "Consumer updated successfully!", data: updated });
+    } catch (error) {
+        console.error("Update consumer error:", error);
+        return res.status(500).json({ msg: "Server error" });
+    }
+});
+
 //Delete the saving account list 
 HomeRouter.delete('/delete-saving-account/:id', async (req, res) => {
     try {
@@ -623,6 +685,121 @@ HomeRouter.delete('/delete-saving-account/:id', async (req, res) => {
     }
 })
 
+// ✅ Update agent by ID
+HomeRouter.put('/update-agent/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, phone, email, password } = req.body;
+
+        // Check if agent exists
+        const existingAgent = await AgentModel.findById(id);
+        if (!existingAgent) {
+            return res.status(404).json({ msg: "Agent not found" });
+        }
+
+        // Check if phone or email already exists (excluding current agent)
+        const duplicateCheck = await AgentModel.findOne({
+            $and: [
+                { _id: { $ne: id } },
+                {
+                    $or: [
+                        ...(phone ? [{ phone: phone }] : []),
+                        ...(email ? [{ email: email }] : [])
+                    ]
+                }
+            ]
+        });
+
+        if (duplicateCheck) {
+            return res.status(400).json({
+                msg: "Phone or Email already exists!"
+            });
+        }
+
+        // Build update data
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (phone) updateData.phone = phone;
+        if (email) updateData.email = email;
+        
+        // If password provided, hash it
+        if (password) {
+            const saltRounds = 10;
+            updateData.password = await bcryptjs.hash(password, saltRounds);
+        }
+
+        const updatedAgent = await AgentModel.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true }
+        );
+
+        return res.status(200).json({
+            msg: "Agent updated successfully!",
+            data: updatedAgent
+        });
+
+    } catch (error) {
+        console.error("Update agent error:", error);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message
+        });
+    }
+});
+
+// ✅ Delete agent by ID
+HomeRouter.delete('/delete-agent/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(401).json({ msg: "Id is required!" });
+        }
+
+        const deletedAgent = await AgentModel.findByIdAndDelete(id);
+
+        if (!deletedAgent) {
+            return res.status(404).json({ msg: "Agent not found" });
+        }
+
+        return res.status(200).json({
+            msg: "Agent deleted successfully!",
+            data: deletedAgent
+        });
+
+    } catch (error) {
+        console.error("Delete agent error:", error);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message
+        });
+    }
+});
+
+// ✅ Get single agent by ID
+HomeRouter.get('/get-agent/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const agent = await AgentModel.findById(id);
+        
+        if (!agent) {
+            return res.status(404).json({ msg: "Agent not found" });
+        }
+
+        return res.status(200).json({
+            msg: "Agent fetched successfully!",
+            data: agent
+        });
+
+    } catch (error) {
+        console.error("Get agent error:", error);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message
+        });
+    }
+});
 
 //delete renuwal saving lists api 
 HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
