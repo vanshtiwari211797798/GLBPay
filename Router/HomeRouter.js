@@ -589,7 +589,7 @@ HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
         const getc_all_renuwal_lists = await newRenuwalSavingModel.find();
 
         if (!getc_all_renuwal_lists) {
-            return res.status(404).json({ msg: "All fields is requireed !" });
+            return res.status(404).json({ msg: "Data not found!" });
         }
 
         return res.status(200).json({ msg: "Data fetched successfully !", data: getc_all_renuwal_lists });
