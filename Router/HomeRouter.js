@@ -721,7 +721,7 @@ HomeRouter.put('/update-agent/:id', async (req, res) => {
         if (name) updateData.name = name;
         if (phone) updateData.phone = phone;
         if (email) updateData.email = email;
-        
+
         // If password provided, hash it
         if (password) {
             const saltRounds = 10;
@@ -782,7 +782,7 @@ HomeRouter.get('/get-agent/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const agent = await AgentModel.findById(id);
-        
+
         if (!agent) {
             return res.status(404).json({ msg: "Agent not found" });
         }
@@ -823,6 +823,34 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
     }
 })
 
+
+//login the conuser by the consumer id and password 
+HomeRouter.post('/consumer-login', async (req, res) => {
+    try {
+        const { consumerid, password } = req.body;
+
+        if (!consumerid || !password) {
+            return res.status(401).json({ msg: 'All fields is required !' })
+        }
+
+        const getConsumer = await ConsumerModel.findOne({ membership_no: consumerid });
+
+        if (!getConsumer) {
+            return res.status(404).json({ msg: "Invalid Creadential" })
+        }
+
+        if (getConsumer.password !== password) {
+            return res.status(401).json({ msg: "Invalid Creadentials" })
+        }
+
+        const newToken = jwt.sign({ email: getConsumer.email }, SECRET_KEY, { expiresIn: "365d" });
+
+        return res.status(201).json({ msg: "Consumer Login Successfully !", token: newToken });
+
+    } catch (error) {
+        console.error(`Error from the consumer login api and error is the ${error}`)
+    }
+})
 
 module.exports = HomeRouter;
 
