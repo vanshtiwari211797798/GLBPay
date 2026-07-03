@@ -612,10 +612,14 @@ HomeRouter.get('/get-consumer/:id', async (req, res) => {
     }
 });
 
-// ✅ Update consumer by ID
-HomeRouter.put('/update-consumer/:id', async (req, res) => {
+// ✅ Update consumer by ID (WITH PHOTO UPLOAD)
+HomeRouter.put('/update-consumer/:id', consumerimg.single('photo'), async (req, res) => {
     try {
         const { id } = req.params;
+        console.log("📥 Update consumer:", id);
+        console.log("📦 Body:", req.body);
+        console.log("📸 File:", req.file);
+
         const updateData = {
             name: req.body.name,
             father: req.body.father,
@@ -642,7 +646,7 @@ HomeRouter.put('/update-consumer/:id', async (req, res) => {
             share_value: req.body.share_value,
         };
 
-        // Photo update if uploaded
+        // ✅ Photo update if uploaded
         if (req.file) {
             updateData.photo = req.file.path;
         }
@@ -655,10 +659,16 @@ HomeRouter.put('/update-consumer/:id', async (req, res) => {
 
         if (!updated) return res.status(404).json({ msg: "Consumer not found" });
 
-        return res.status(200).json({ msg: "Consumer updated successfully!", data: updated });
+        return res.status(200).json({ 
+            msg: "Consumer updated successfully!", 
+            data: updated 
+        });
     } catch (error) {
-        console.error("Update consumer error:", error);
-        return res.status(500).json({ msg: "Server error" });
+        console.error("❌ Update consumer error:", error);
+        return res.status(500).json({ 
+            msg: "Server error", 
+            error: error.message 
+        });
     }
 });
 
@@ -851,6 +861,45 @@ HomeRouter.post('/consumer-login', async (req, res) => {
         console.error(`Error from the consumer login api and error is the ${error}`)
     }
 })
+
+// ✅ Update Renewal Saving by ID
+HomeRouter.put('/update-renuwal-saving/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { accountno, holdername, phone, branch, deposit_amount, deposit_by } = req.body;
+
+        const existingRenewal = await newRenuwalSavingModel.findById(id);
+        if (!existingRenewal) {
+            return res.status(404).json({ msg: "Renewal record not found" });
+        }
+
+        const updateData = {};
+        if (accountno) updateData.accountno = accountno;
+        if (holdername) updateData.holdername = holdername;
+        if (phone) updateData.phone = phone;
+        if (branch) updateData.branch = branch;
+        if (deposit_amount) updateData.deposit_amount = deposit_amount;
+        if (deposit_by) updateData.deposit_by = deposit_by;
+
+        const updatedRenewal = await newRenuwalSavingModel.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true }
+        );
+
+        return res.status(200).json({
+            msg: "Renewal updated successfully!",
+            data: updatedRenewal
+        });
+
+    } catch (error) {
+        console.error("Update renewal error:", error);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message
+        });
+    }
+});
 
 module.exports = HomeRouter;
 
