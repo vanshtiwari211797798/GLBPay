@@ -929,8 +929,6 @@ HomeRouter.post('/consumer-login', async (req, res) => {
 })
 
 
-
-
 module.exports = HomeRouter;
 
 

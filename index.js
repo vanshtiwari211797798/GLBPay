@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require('express');
 const HomeRouter = require('./Router/HomeRouter');
+const AppRouter = require('./Router/AppRouter');
 const ConnectDB = require('./DB/db');
 const cors = require('cors');
 
@@ -21,6 +22,7 @@ app.use(express.json());
 
 // routes
 app.use('/api/home', HomeRouter);
+app.use('/api/app', AppRouter);
 
 
 const PORT = process.env.PORT || 5500;
