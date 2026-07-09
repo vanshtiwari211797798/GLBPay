@@ -17,7 +17,7 @@ const fetchProfileConsumer = async (req, res, next) => {
         console.log("🔍 Decoded token:", is_verify);
 
         // ✅ Password bhi le lo (select({ password: 0 }) hatao)
-        const fetchData = await ConsumerModel.findOne({ phone: is_verify.email }).select({ password: 0 });
+        const fetchData = await ConsumerModel.findOne({ email: is_verify.email }).select({ password: 0 });
         // ❌ Pehle: .select({ password: 0 }) - isme password nahi aata tha
 
         console.log("👤 Consumer found:", fetchData ? fetchData.name : "Not found");
