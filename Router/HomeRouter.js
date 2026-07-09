@@ -901,7 +901,7 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
 
 
 //login the conuser by the consumer id and password 
-HomeRouter.post('/consumer-login', async (req, res) => {
+HomeRouter.post('/consumer-login', async (req, res) => { 
     try {
         const { consumerid, password } = req.body;
 
