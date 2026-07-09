@@ -111,10 +111,21 @@ const SavingSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    upiIds: {
+    type: [String],  // Array of 3 UPI IDs
+    default: []
+},
+upiPin: {
+    type: String,    // Hashed 4-digit PIN
+    default: null
+},
+isUpiActive: {
+    type: Boolean,
+    default: false
+}
 }, {
     timestamps: true
 })
-
 
 const SavingModel = new mongoose.model("saving", SavingSchema);
 module.exports = SavingModel;
