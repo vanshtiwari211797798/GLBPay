@@ -4,7 +4,7 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const jwt = require('jsonwebtoken');
 
 const fetchProfileConsumer = async (req, res, next) => { 
-    try {
+    try { 
         const token = req.header('Authorization');
 
         if (!token) {
