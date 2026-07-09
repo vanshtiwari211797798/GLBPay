@@ -3,7 +3,7 @@ const ConsumerModel = require('../Models/ConsumerModel');
 const SECRET_KEY = process.env.SECRET_KEY;
 const jwt = require('jsonwebtoken');
 
-const fetchProfileConsumer = async (req, res, next) => {
+const fetchProfileConsumer = async (req, res, next) => { 
     try {
         const token = req.header('Authorization');
 
