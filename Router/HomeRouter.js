@@ -899,7 +899,6 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
 })
 
 
-
 //login the conuser by the consumer id and password 
 HomeRouter.post('/consumer-login', async (req, res) => { 
     try {
@@ -928,6 +927,40 @@ HomeRouter.post('/consumer-login', async (req, res) => {
     }
 })
 
+
+// ✅ Fetch consumers whose UPI is ACTIVE
+HomeRouter.get('/upi-active-consumers', async (_, res) => {
+    try {
+        const activeUpiConsumers = await ConsumerModel.find({ isUpiActive: true }).select('-password -upiPin');
+
+        return res.status(200).json({
+            msg: "UPI active consumers fetched successfully !",
+            count: activeUpiConsumers.length,
+            data: activeUpiConsumers
+        });
+
+    } catch (error) {
+        console.error(`Error from fetching UPI active consumers and error is the ${error}`);
+        return res.status(500).json({ msg: "Server error", error: error.message });
+    }
+})
+
+// ✅ Fetch consumers whose UPI is NOT ACTIVE
+HomeRouter.get('/upi-inactive-consumers', async (_, res) => {
+    try {
+        const inactiveUpiConsumers = await ConsumerModel.find({ isUpiActive: false }).select('-password -upiPin');
+
+        return res.status(200).json({
+            msg: "UPI inactive consumers fetched successfully !",
+            count: inactiveUpiConsumers.length,
+            data: inactiveUpiConsumers
+        });
+
+    } catch (error) {
+        console.error(`Error from fetching UPI inactive consumers and error is the ${error}`);
+        return res.status(500).json({ msg: "Server error", error: error.message });
+    }
+})
 
 module.exports = HomeRouter;
 
