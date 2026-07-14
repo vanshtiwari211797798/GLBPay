@@ -935,4 +935,25 @@ AppRouter.get('/get-all-active-upi', fetchProfileConsumer, async (req, res) => {
     }
 })
 
+//  15.  get all in actuve upi details 
+AppRouter.get('/get-all-inactive-upi', fetchProfileConsumer, async (req, res) => {
+    try {
+        const getConsumer_data_inactive = req.cprofile.membership_no;
+
+        //fetch all inactive users saving accvount details thats upi is not created 
+
+        const get_inactive_upi = await SavingModel.find({ membership_id: getConsumer_data_inactive, isUpiActive: !true })
+
+        if (get_inactive_upi.length === 0) {
+            return res.status(404).json({
+                msg: "No Inactive UPI Available"
+            });
+        }
+
+        return res.status(200).json({ msg: "Data fetched duccessfully !", data: get_inactive_upi });
+    } catch (error) {
+        console.error(`Error from fetch all inactive upi details dat and eror is the ${error}`)
+    }
+})
+
 module.exports = AppRouter;
