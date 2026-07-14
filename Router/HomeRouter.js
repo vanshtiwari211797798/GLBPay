@@ -900,7 +900,7 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
 
 
 //login the conuser by the consumer id and password 
-HomeRouter.post('/consumer-login', async (req, res) => { 
+HomeRouter.post('/consumer-login', async (req, res) => {
     try {
         const { consumerid, password } = req.body;
 
@@ -928,39 +928,104 @@ HomeRouter.post('/consumer-login', async (req, res) => {
 })
 
 
-// ✅ Fetch consumers whose UPI is ACTIVE
-HomeRouter.get('/upi-active-consumers', async (_, res) => {
+// ✅ Fetch all accounts where UPI is ACTIVE (account level)
+HomeRouter.get('/upi-active-accounts', async (_, res) => {
     try {
-        const activeUpiConsumers = await ConsumerModel.find({ isUpiActive: true }).select('-password -upiPin');
+        const activeUpiAccounts = await SavingModel.find({ isUpiActive: true })
+            .select('saving_number account_holder phone upiIds isUpiActive membership_id branch');
+
+        if (!activeUpiAccounts || activeUpiAccounts.length === 0) {
+            return res.status(404).json({
+                msg: "No accounts with active UPI found"
+            });
+        }
+
+        // ✅ Fetch consumer details for each account
+        const ConsumerModel = require('../Models/ConsumerModel');
+        const accountsWithConsumer = await Promise.all(
+            activeUpiAccounts.map(async (account) => {
+                const consumer = await ConsumerModel.findOne({
+                    membership_no: account.membership_id
+                }).select('name phone email photo membership_no');
+
+                return {
+                    account: {
+                        saving_number: account.saving_number,
+                        account_holder: account.account_holder,
+                        phone: account.phone,
+                        branch: account.branch,
+                        upiIds: account.upiIds || [],
+                        isUpiActive: account.isUpiActive
+                    },
+                    consumer: consumer || null
+                };
+            })
+        );
 
         return res.status(200).json({
-            msg: "UPI active consumers fetched successfully !",
-            count: activeUpiConsumers.length,
-            data: activeUpiConsumers
+            msg: "UPI active accounts fetched successfully !",
+            count: accountsWithConsumer.length,
+            data: accountsWithConsumer
         });
 
     } catch (error) {
-        console.error(`Error from fetching UPI active consumers and error is the ${error}`);
-        return res.status(500).json({ msg: "Server error", error: error.message });
+        console.error(`Error from fetching UPI active accounts: ${error}`);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message
+        });
     }
-})
+});
 
 // ✅ Fetch consumers whose UPI is NOT ACTIVE
-HomeRouter.get('/upi-inactive-consumers', async (_, res) => {
+// ✅ Fetch all accounts where UPI is NOT ACTIVE (account level)
+HomeRouter.get('/upi-inactive-accounts', async (_, res) => {
     try {
-        const inactiveUpiConsumers = await ConsumerModel.find({ isUpiActive: false }).select('-password -upiPin');
+        const inactiveUpiAccounts = await SavingModel.find({ isUpiActive: false })
+            .select('saving_number account_holder phone upiIds isUpiActive membership_id branch');
+
+        if (!inactiveUpiAccounts || inactiveUpiAccounts.length === 0) {
+            return res.status(404).json({
+                msg: "No accounts with inactive UPI found"
+            });
+        }
+
+        // ✅ Fetch consumer details for each account
+        const ConsumerModel = require('../Models/ConsumerModel');
+        const accountsWithConsumer = await Promise.all(
+            inactiveUpiAccounts.map(async (account) => {
+                const consumer = await ConsumerModel.findOne({
+                    membership_no: account.membership_id
+                }).select('name phone email photo membership_no');
+
+                return {
+                    account: {
+                        saving_number: account.saving_number,
+                        account_holder: account.account_holder,
+                        phone: account.phone,
+                        branch: account.branch,
+                        upiIds: account.upiIds || [],
+                        isUpiActive: account.isUpiActive
+                    },
+                    consumer: consumer || null
+                };
+            })
+        );
 
         return res.status(200).json({
-            msg: "UPI inactive consumers fetched successfully !",
-            count: inactiveUpiConsumers.length,
-            data: inactiveUpiConsumers
+            msg: "UPI inactive accounts fetched successfully !",
+            count: accountsWithConsumer.length,
+            data: accountsWithConsumer
         });
 
     } catch (error) {
-        console.error(`Error from fetching UPI inactive consumers and error is the ${error}`);
-        return res.status(500).json({ msg: "Server error", error: error.message });
+        console.error(`Error from fetching UPI inactive accounts: ${error}`);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message
+        });
     }
-})
+});
 
 module.exports = HomeRouter;
 
