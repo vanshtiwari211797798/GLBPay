@@ -30,9 +30,9 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
         }
 
         // ✅ Find the specific account
-        const account = await SavingModel.findOne({ 
+        const account = await SavingModel.findOne({
             saving_number: accountNumber,
-            membership_id: consumer.membership_no 
+            membership_id: consumer.membership_no
         });
 
         if (!account) {
@@ -196,7 +196,7 @@ AppRouter.post('/mini-statement', fetchProfileConsumer, async (req, res) => {
         const allTransactions = await newRenuwalSavingModel
             .find({ accountno: account.saving_number })
             .sort({ createdAt: 1 });
-        
+
         let runningBalance = 0;
         const balanceMap = {};
         allTransactions.forEach(t => {
@@ -244,7 +244,7 @@ AppRouter.post('/mini-statement', fetchProfileConsumer, async (req, res) => {
         console.error(`Error from fetching mini statement ${error}`);
         return res.status(500).json({ msg: "Server Error", error: error.message });
     }
-});  
+});
 
 // 5. Change Password (Consumer Login Password)
 AppRouter.put('/change-password', fetchProfileConsumer, async (req, res) => {
@@ -324,13 +324,13 @@ AppRouter.post('/passbook', fetchProfileConsumer, async (req, res) => {
         const passbook = allTransactions.map(txn => {
             const amount = Number(txn.deposit_amount);
             running_balance += amount;
-            
+
             // Determine transaction type
             let type = 'CREDIT';
             let description = txn.deposit_by || 'Transaction';
             let credit = 0;
             let debit = 0;
-            
+
             if (amount > 0) {
                 credit = amount;
                 type = 'CREDIT';
@@ -528,7 +528,7 @@ AppRouter.post('/activate-upi', fetchProfileConsumer, async (req, res) => {
 
         // ✅ Generate 3 UPI IDs for this account
         const cleanPhone = consumer.phone.replace(/[^0-9]/g, '');
-        
+
         // Find the next available counter
         const allAccounts = await SavingModel.find({ membership_id: consumer.membership_no });
         let maxCounter = 0;
@@ -915,5 +915,24 @@ AppRouter.delete('/delete-secondary-upi', fetchProfileConsumer, async (req, res)
         return res.status(500).json({ msg: "Server Error" });
     }
 });
+
+// 14. Fetch all active upi ids date show 
+
+AppRouter.get('/get-all-active-upi', fetchProfileConsumer, async (req, res) => {
+    try {
+        const active_upi_data = req.cprofile.membership_no;
+        const get_active_upi_q = await SavingModel.find({ membership_id: active_upi_data, isUpiActive: true });
+
+        if (get_active_upi_q.length === 0) {
+            return res.status(404).json({
+                msg: "No Active UPI Available"
+            });
+        }
+
+        return res.status(200).json({ msg: "Data fetched duccessfully !", data: get_active_upi_q });
+    } catch (error) {
+        console.error(`Error from fetching the upi ids and error is the ${error}`)
+    }
+})
 
 module.exports = AppRouter;
