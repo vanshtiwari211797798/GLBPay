@@ -14,7 +14,7 @@ AppRouter.get('/consumer-profile', fetchProfileConsumer, async (req, res) => {
     }
 });
 
-// 2. Account Balance (Specific Account + UPI PIN Required)
+// 2. Account Balance (Sirf Available Balance)
 AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
     try {
         const consumer = req.cprofile;
@@ -29,7 +29,6 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
             return res.status(400).json({ msg: "UPI PIN is required !" });
         }
 
-        // ✅ Find the specific account
         const account = await SavingModel.findOne({
             saving_number: accountNumber,
             membership_id: consumer.membership_no
@@ -39,19 +38,21 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
             return res.status(404).json({ msg: "Account not found for this consumer !" });
         }
 
-        // ✅ Check if UPI is active
         if (!account.isUpiActive) {
             return res.status(400).json({ msg: "UPI is not activated for this account ! Please activate UPI first." });
         }
 
-        // ✅ Verify UPI PIN (plain text comparison for now)
         if (account.upiPin !== upiPin) {
             return res.status(401).json({ msg: "Invalid UPI PIN !" });
         }
 
-        // ✅ Calculate balance from renewals
         const renewals = await newRenuwalSavingModel.find({ accountno: account.saving_number });
         const total_deposited = renewals.reduce((sum, r) => sum + Number(r.deposit_amount), 0);
+
+        // ✅ Available balance — (total deposits - minimum balance)
+        const minimumBalance = Number(account.minimum_d) || 0;
+        let availableBalance = total_deposited - minimumBalance;
+        if (availableBalance < 0) availableBalance = 0;
 
         return res.status(200).json({
             msg: "Account balance fetched successfully !",
@@ -61,8 +62,7 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
                 branch: account.branch,
                 phone: account.phone,
                 upiIds: account.upiIds || [],
-                balance: total_deposited,
-                available_balance: total_deposited - (account.minimum_d || 0)
+                balance: availableBalance  // ✅ Sirf available balance
             }
         });
 
@@ -979,7 +979,7 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
             return res.status(400).json({ msg: "UPI PIN is required !" });
         }
 
-        // ✅ Find sender account by UPI ID (search in upiIds array)
+        // ✅ Find sender account by UPI ID
         const senderAccount = await SavingModel.findOne({
             upiIds: { $in: [senderUpiId] },
             membership_id: sender.membership_no
@@ -999,12 +999,18 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
             return res.status(401).json({ msg: "Invalid UPI PIN !" });
         }
 
-        // ✅ Check sender balance
+        // ✅ Check sender balance (with minimum balance)
         const allDeposits = await newRenuwalSavingModel.find({ accountno: senderAccount.saving_number });
         const senderBalance = allDeposits.reduce((sum, r) => sum + Number(r.deposit_amount), 0);
+        
+        const minimumBalance = Number(senderAccount.minimum_d) || 0;
+        const availableBalance = Math.max(0, senderBalance - minimumBalance);
 
-        if (senderBalance < amount) {
-            return res.status(400).json({ msg: "Insufficient balance !" });
+        // ✅ Insufficient balance check
+        if (availableBalance < amount) {
+            return res.status(400).json({ 
+                msg: `Insufficient balance ! Available balance: ₹${availableBalance}` 
+            });
         }
 
         // ✅ Find receiver by UPI ID
