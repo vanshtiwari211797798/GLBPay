@@ -1090,4 +1090,35 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
     }
 });
 
+
+// 14. Get UPI ID by Account Number
+AppRouter.get('/get-primary-upi/:accountNumber', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized access" });
+
+        const { accountNumber } = req.params;
+
+        const account = await SavingModel.findOne({
+            saving_number: parseInt(accountNumber),
+            membership_id: consumer.membership_no
+        });
+
+        if (!account) {
+            return res.status(404).json({ msg: "Account not found !" });
+        }
+
+        if (!account.isUpiActive) {
+            return res.status(400).json({ msg: "UPI not active for this account !" });
+        }
+
+        return res.status(200).json({
+            upiId: account.upiIds?.[0] || null
+        });
+
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        return res.status(500).json({ msg: "Server Error" });
+    }
+});
 module.exports = AppRouter;
