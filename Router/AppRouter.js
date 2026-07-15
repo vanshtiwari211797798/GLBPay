@@ -956,4 +956,132 @@ AppRouter.get('/get-all-inactive-upi', fetchProfileConsumer, async (req, res) =>
     }
 })
 
+
+// 10. UPI Transaction (UPI to UPI — Simplified)
+AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
+    try {
+        const sender = req.cprofile;
+        if (!sender) return res.status(401).json({ msg: "Unauthorized access" });
+
+        const { senderUpiId, receiverUpiId, amount, upiPin, note } = req.body;
+
+        // ✅ Validation
+        if (!senderUpiId) {
+            return res.status(400).json({ msg: "Sender UPI ID is required !" });
+        }
+        if (!receiverUpiId) {
+            return res.status(400).json({ msg: "Receiver UPI ID is required !" });
+        }
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ msg: "Valid amount is required !" });
+        }
+        if (!upiPin) {
+            return res.status(400).json({ msg: "UPI PIN is required !" });
+        }
+
+        // ✅ Find sender account by UPI ID (search in upiIds array)
+        const senderAccount = await SavingModel.findOne({
+            upiIds: { $in: [senderUpiId] },
+            membership_id: sender.membership_no
+        });
+
+        if (!senderAccount) {
+            return res.status(404).json({ msg: "Sender UPI ID not found !" });
+        }
+
+        // ✅ Check if sender UPI is active
+        if (!senderAccount.isUpiActive) {
+            return res.status(400).json({ msg: "Sender UPI is not active !" });
+        }
+
+        // ✅ Verify UPI PIN
+        if (senderAccount.upiPin !== upiPin) {
+            return res.status(401).json({ msg: "Invalid UPI PIN !" });
+        }
+
+        // ✅ Check sender balance
+        const allDeposits = await newRenuwalSavingModel.find({ accountno: senderAccount.saving_number });
+        const senderBalance = allDeposits.reduce((sum, r) => sum + Number(r.deposit_amount), 0);
+
+        if (senderBalance < amount) {
+            return res.status(400).json({ msg: "Insufficient balance !" });
+        }
+
+        // ✅ Find receiver by UPI ID
+        const receiverAccount = await SavingModel.findOne({
+            upiIds: { $in: [receiverUpiId] }
+        });
+
+        if (!receiverAccount) {
+            return res.status(404).json({ msg: "Receiver UPI ID not found !" });
+        }
+
+        // ✅ Self-transfer check
+        if (receiverAccount.saving_number === senderAccount.saving_number) {
+            return res.status(400).json({ msg: "Cannot transfer to your own account !" });
+        }
+
+        // ✅ Check if receiver UPI is active
+        if (!receiverAccount.isUpiActive) {
+            return res.status(400).json({ msg: "Receiver UPI is not active !" });
+        }
+
+        // ✅ Find receiver consumer details
+        const ConsumerModel = require('../Models/ConsumerModel');
+        const receiverConsumer = await ConsumerModel.findOne({
+            membership_no: receiverAccount.membership_id
+        });
+
+        if (!receiverConsumer) {
+            return res.status(404).json({ msg: "Receiver not found !" });
+        }
+
+        // ✅ Debit sender
+        const debitEntry = new newRenuwalSavingModel({
+            accountno: senderAccount.saving_number,
+            holdername: sender.name,
+            phone: sender.phone,
+            branch: senderAccount.branch,
+            deposit_amount: -amount,
+            deposit_by: `UPI to ${receiverConsumer.name} (${receiverUpiId})`
+        });
+        await debitEntry.save();
+
+        // ✅ Credit receiver
+        const creditEntry = new newRenuwalSavingModel({
+            accountno: receiverAccount.saving_number,
+            holdername: receiverConsumer.name,
+            phone: receiverConsumer.phone,
+            branch: receiverAccount.branch,
+            deposit_amount: amount,
+            deposit_by: `UPI from ${sender.name} (${senderUpiId})`
+        });
+        await creditEntry.save();
+
+        return res.status(200).json({
+            msg: "UPI transfer completed successfully !",
+            transaction: {
+                from: {
+                    name: sender.name,
+                    account: senderAccount.saving_number,
+                    upiId: senderUpiId
+                },
+                to: {
+                    name: receiverConsumer.name,
+                    account: receiverAccount.saving_number,
+                    upiId: receiverUpiId
+                },
+                amount: amount,
+                note: note || "N/A",
+                timestamp: new Date().toISOString(),
+                transactionId: debitEntry._id
+            }
+        });
+
+    } catch (error) {
+        console.error(`Error from UPI transfer: ${error}`);
+        return res.status(500).json({ msg: "Server Error", error: error.message });
+    }
+});
+
 module.exports = AppRouter;
