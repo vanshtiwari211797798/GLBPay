@@ -1002,4 +1002,41 @@ AppRouter.get('/get-primary-upi/:accountNumber', fetchProfileConsumer, async (re
 });
 
 
+
+//15. Get UPI PIN by Account Number
+AppRouter.get('/get-upi-pin', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized access" });
+
+        const { accountNumber } = req.query;
+
+        if (!accountNumber) {
+            return res.status(400).json({ msg: "Account number is required in query param !" });
+        }
+
+        const account = await SavingModel.findOne({
+            saving_number: parseInt(accountNumber),
+            membership_id: consumer.membership_no
+        });
+
+        if (!account) {
+            return res.status(404).json({ msg: "Account not found !" });
+        }
+
+        if (!account.isUpiActive) {
+            return res.status(400).json({ msg: "UPI is not active for this account !" });
+        }
+
+        return res.status(200).json({
+            accountNumber: account.saving_number,
+            accountHolder: account.account_holder,
+            upiPin: account.upiPin || null
+        });
+
+    } catch (error) {
+        console.error(`Error from getting UPI PIN: ${error}`);
+        return res.status(500).json({ msg: "Server Error", error: error.message });
+    }
+});
 module.exports = AppRouter;
