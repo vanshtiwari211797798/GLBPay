@@ -888,7 +888,7 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         // ✅ Insufficient balance check
         if (availableBalance < amount) {
             return res.status(400).json({ 
-                msg: `Insufficient balance ! Available balance: ₹${availableBalance}` 
+                msg: `Insufficient balance ! ` 
             });
         }
 
