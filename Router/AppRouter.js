@@ -1039,4 +1039,41 @@ AppRouter.get('/get-upi-pin', fetchProfileConsumer, async (req, res) => {
         return res.status(500).json({ msg: "Server Error", error: error.message });
     }
 });
+
+
+//16. Recent 12 Transactions
+AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
+
+        const accounts = await SavingModel.find({ membership_id: consumer.membership_no });
+        if (!accounts.length) return res.status(404).json({ msg: "No accounts found" });
+
+        const accNos = accounts.map(a => a.saving_number);
+
+        const txns = await newRenuwalSavingModel
+            .find({ accountno: { $in: accNos } })
+            .sort({ createdAt: -1 })
+            .limit(12);
+
+        if (!txns.length) return res.status(404).json({ msg: "No transactions" });
+
+        const data = txns.map(t => ({
+            id: t._id,
+            date: t.createdAt,
+            account: t.accountno,
+            holder: t.holdername,
+            amount: Math.abs(Number(t.deposit_amount)),
+            type: t.deposit_amount > 0 ? 'CREDIT' : 'DEBIT',
+            desc: t.deposit_by || 'Transaction'
+        }));
+
+        res.json({ msg: "Recent transactions", total: data.length, data });
+
+    } catch (error) {
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
 module.exports = AppRouter;
