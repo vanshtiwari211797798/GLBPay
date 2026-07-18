@@ -1055,7 +1055,7 @@ AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
         const txns = await newRenuwalSavingModel
             .find({ accountno: { $in: accNos } })
             .sort({ createdAt: -1 })
-            .limit(12);
+            .limit(15);
 
         if (!txns.length) return res.status(404).json({ msg: "No transactions" });
 
