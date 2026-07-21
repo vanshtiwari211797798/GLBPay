@@ -14,7 +14,7 @@ AppRouter.get('/consumer-profile', fetchProfileConsumer, async (req, res) => {
     }
 });
 
-// 2. Account Balance (Sirf Available Balance)
+// 2. Account Balance (Sirf Total Deposited)
 AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
     try {
         const consumer = req.cprofile;
@@ -29,9 +29,9 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
             return res.status(400).json({ msg: "UPI PIN is required !" });
         }
 
-        const account = await SavingModel.findOne({
+        const account = await SavingModel.findOne({ 
             saving_number: accountNumber,
-            membership_id: consumer.membership_no
+            membership_id: consumer.membership_no 
         });
 
         if (!account) {
@@ -49,11 +49,6 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
         const renewals = await newRenuwalSavingModel.find({ accountno: account.saving_number });
         const total_deposited = renewals.reduce((sum, r) => sum + Number(r.deposit_amount), 0);
 
-        // ✅ Available balance — (total deposits - minimum balance)
-        const minimumBalance = Number(account.minimum_d) || 0;
-        let availableBalance = total_deposited - minimumBalance;
-        if (availableBalance < 0) availableBalance = 0;
-
         return res.status(200).json({
             msg: "Account balance fetched successfully !",
             data: {
@@ -62,7 +57,7 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
                 branch: account.branch,
                 phone: account.phone,
                 upiIds: account.upiIds || [],
-                balance: availableBalance  // ✅ Sirf available balance
+                balance: total_deposited
             }
         });
 
@@ -798,12 +793,15 @@ AppRouter.get('/get-all-inactive-upi', fetchProfileConsumer, async (req, res) =>
     }
 })
 
-
-// 10. UPI Transaction (UPI to UPI — Receiver Optional)
+//upi transfer api
 AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
     try {
+
         const sender = req.cprofile;
-        if (!sender) return res.status(401).json({ msg: "Unauthorized access" });
+
+        if (!sender) {
+            return res.status(401).json({ msg: "Unauthorized access" });
+        }
 
         const { senderUpiId, receiverUpiId, amount, upiPin, note } = req.body;
 
@@ -811,58 +809,121 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
             return res.status(400).json({ msg: "All fields are required !" });
         }
 
-        // ✅ Find sender account
+        // Sender Account
         const senderAccount = await SavingModel.findOne({
             upiIds: { $in: [senderUpiId] },
             membership_id: sender.membership_no
         });
 
-        if (!senderAccount) return res.status(404).json({ msg: "Sender UPI ID not found !" });
-        if (!senderAccount.isUpiActive) return res.status(400).json({ msg: "Sender UPI is not active !" });
-        if (senderAccount.upiPin !== upiPin) return res.status(401).json({ msg: "Invalid UPI PIN !" });
-
-        // ✅ Check sender balance
-        const allDeposits = await newRenuwalSavingModel.find({ accountno: senderAccount.saving_number });
-        const senderBalance = allDeposits.reduce((sum, r) => sum + Number(r.deposit_amount), 0);
-        const minimumBalance = Number(senderAccount.minimum_d) || 0;
-        const availableBalance = Math.max(0, senderBalance - minimumBalance);
-
-        if (availableBalance < amount) {
-            return res.status(400).json({ msg: `Insufficient balance ! Available: ₹${availableBalance}` });
+        if (!senderAccount) {
+            return res.status(404).json({ msg: "Sender UPI ID not found !" });
         }
 
-        // ✅ Debit sender (always)
+        if (!senderAccount.isUpiActive) {
+            return res.status(400).json({ msg: "Sender UPI is not active !" });
+        }
+
+        if (senderAccount.upiPin !== upiPin) {
+            return res.status(401).json({ msg: "Invalid UPI PIN !" });
+        }
+
+        // Sender Balance
+        const allDeposits = await newRenuwalSavingModel.find({
+            accountno: senderAccount.saving_number
+        });
+
+        const senderBalance = allDeposits.reduce(
+            (sum, item) => sum + Number(item.deposit_amount),
+            0
+        );
+
+        const minimumBalance = Number(senderAccount.minimum_d) || 0;
+
+        const availableBalance = Math.max(
+            0,
+            senderBalance - minimumBalance
+        );
+
+        if (availableBalance < Number(amount)) {
+            return res.status(400).json({
+                msg: `Insufficient balance ! Available: ₹${availableBalance}`
+            });
+        }
+
+        // ==========================
+        // Debit Sender
+        // ==========================
+
         const debitEntry = new newRenuwalSavingModel({
             accountno: senderAccount.saving_number,
             holdername: sender.name,
             phone: sender.phone,
             branch: senderAccount.branch,
-            deposit_amount: -amount,
+            deposit_amount: -Number(amount),
             deposit_by: `UPI to ${receiverUpiId}`
         });
+
         await debitEntry.save();
 
-        // ✅ Try to credit receiver (if UPI ID exists in system)
-        const receiverAccount = await SavingModel.findOne({ upiIds: { $in: [receiverUpiId] } });
-        const ConsumerModel = require('../Models/ConsumerModel');
-        
+        // ==========================
+        // Credit Receiver
+        // ==========================
+
+        const ConsumerModel = require("../Models/ConsumerModel");
+
+        const receiverAccount = await SavingModel.findOne({
+            upiIds: { $in: [receiverUpiId] }
+        });
+
+        let receiverStatus = "completed";
+
         if (receiverAccount && receiverAccount.isUpiActive) {
-            const receiverConsumer = await ConsumerModel.findOne({ membership_no: receiverAccount.membership_id });
-            if (receiverConsumer) {
-                const creditEntry = new newRenuwalSavingModel({
-                    accountno: receiverAccount.saving_number,
-                    holdername: receiverConsumer.name,
-                    phone: receiverConsumer.phone,
-                    branch: receiverAccount.branch,
-                    deposit_amount: amount,
-                    deposit_by: `UPI from ${sender.name} (${senderUpiId})`
-                });
-                await creditEntry.save();
-            }
+
+            const receiverConsumer = await ConsumerModel.findOne({
+                membership_no: receiverAccount.membership_id
+            });
+
+            const creditEntry = new newRenuwalSavingModel({
+                accountno: receiverAccount.saving_number,
+                holdername: receiverConsumer
+                    ? receiverConsumer.name
+                    : receiverUpiId.split("@")[0],
+                phone: receiverConsumer
+                    ? receiverConsumer.phone
+                    : "NA",
+                branch: receiverAccount.branch || "NA",
+                deposit_amount: Number(amount),
+                deposit_by: `UPI from ${sender.name} (${senderUpiId})`
+            });
+
+            await creditEntry.save();
+
+        } else {
+
+            // Receiver outside GLBPay
+
+            const receiverName = receiverUpiId.split("@")[0];
+
+            const creditEntry = new newRenuwalSavingModel({
+                accountno: receiverUpiId,
+                holdername: receiverName,
+                phone: "NA",
+                branch: "NA",
+                deposit_amount: Number(amount),
+                deposit_by: `UPI from ${sender.name} (${senderUpiId})`
+            });
+
+            await creditEntry.save();
+
+            receiverStatus = "outside_bank";
         }
 
+        // ==========================
+        // Response
+        // ==========================
+
         return res.status(200).json({
-            msg: "UPI transfer completed successfully !",
+            msg: "UPI transfer completed successfully!",
             transaction: {
                 from: {
                     name: sender.name,
@@ -871,9 +932,9 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
                 },
                 to: {
                     upiId: receiverUpiId,
-                    status: receiverAccount && receiverAccount.isUpiActive ? "completed" : "completed"
+                    status: receiverStatus
                 },
-                amount: amount,
+                amount: Number(amount),
                 note: note || "N/A",
                 timestamp: new Date().toISOString(),
                 transactionId: debitEntry._id
@@ -881,8 +942,14 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`Error from UPI transfer: ${error}`);
-        return res.status(500).json({ msg: "Server Error", error: error.message });
+
+        console.error("Error from UPI transfer:", error);
+
+        return res.status(500).json({
+            msg: "Server Error",
+            error: error.message
+        });
+
     }
 });
 
@@ -1032,5 +1099,8 @@ AppRouter.get('/all-txn', fetchProfileConsumer, async (req, res) => {
         res.status(500).json({ msg: "Server Error" });
     }
 });
+
+
+
 
 module.exports = AppRouter;
