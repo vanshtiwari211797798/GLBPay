@@ -29,9 +29,9 @@ AppRouter.post('/account-balance', fetchProfileConsumer, async (req, res) => {
             return res.status(400).json({ msg: "UPI PIN is required !" });
         }
 
-        const account = await SavingModel.findOne({ 
+        const account = await SavingModel.findOne({
             saving_number: accountNumber,
-            membership_id: consumer.membership_no 
+            membership_id: consumer.membership_no
         });
 
         if (!account) {
@@ -665,7 +665,7 @@ AppRouter.post('/bank-transfer', fetchProfileConsumer, async (req, res) => {
         if (receiverAccount && receiverAccount.isUpiActive) {
             const ConsumerModel = require('../Models/ConsumerModel');
             const receiverConsumer = await ConsumerModel.findOne({ membership_no: receiverAccount.membership_id });
-            
+
             if (receiverConsumer) {
                 const creditEntry = new newRenuwalSavingModel({
                     accountno: receiverAccount.saving_number,
@@ -796,7 +796,6 @@ AppRouter.get('/get-all-inactive-upi', fetchProfileConsumer, async (req, res) =>
 //upi transfer api
 AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
     try {
-
         const sender = req.cprofile;
 
         if (!sender) {
@@ -809,7 +808,9 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
             return res.status(400).json({ msg: "All fields are required !" });
         }
 
-        // Sender Account
+        // ==========================
+        // 1. Sender Verification
+        // ==========================
         const senderAccount = await SavingModel.findOne({
             upiIds: { $in: [senderUpiId] },
             membership_id: sender.membership_no
@@ -827,7 +828,9 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
             return res.status(401).json({ msg: "Invalid UPI PIN !" });
         }
 
-        // Sender Balance
+        // ==========================
+        // 2. Sender Balance Check
+        // ==========================
         const allDeposits = await newRenuwalSavingModel.find({
             accountno: senderAccount.saving_number
         });
@@ -838,11 +841,7 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         );
 
         const minimumBalance = Number(senderAccount.minimum_d) || 0;
-
-        const availableBalance = Math.max(
-            0,
-            senderBalance - minimumBalance
-        );
+        const availableBalance = Math.max(0, senderBalance - minimumBalance);
 
         if (availableBalance < Number(amount)) {
             return res.status(400).json({
@@ -851,9 +850,8 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         }
 
         // ==========================
-        // Debit Sender
+        // 3. Debit Sender
         // ==========================
-
         const debitEntry = new newRenuwalSavingModel({
             accountno: senderAccount.saving_number,
             holdername: sender.name,
@@ -866,9 +864,8 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         await debitEntry.save();
 
         // ==========================
-        // Credit Receiver
+        // 4. Credit Receiver
         // ==========================
-
         const ConsumerModel = require("../Models/ConsumerModel");
 
         const receiverAccount = await SavingModel.findOne({
@@ -878,7 +875,7 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         let receiverStatus = "completed";
 
         if (receiverAccount && receiverAccount.isUpiActive) {
-
+            // Inside Bank (GLBPay user)
             const receiverConsumer = await ConsumerModel.findOne({
                 membership_no: receiverAccount.membership_id
             });
@@ -899,18 +896,22 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
             await creditEntry.save();
 
         } else {
-
-            // Receiver outside GLBPay
-
-            const receiverName = receiverUpiId.split("@")[0];
+            // Outside GLBPay User
+            const receiverUsername = receiverUpiId.split("@")[0];
+            
+            // Username me se string ko number me parse kar rahe hain
+            const parsedAccountNo = parseInt(receiverUsername, 10);
+            
+            // Agar parse hue number valid hain to wo, varna default 0 safe-side ke liye
+            const safeAccountNo = !isNaN(parsedAccountNo) ? parsedAccountNo : 0;
 
             const creditEntry = new newRenuwalSavingModel({
-                accountno: receiverUpiId,
-                holdername: receiverName,
+                accountno: safeAccountNo, // ✅ Fixed: Ab Mongoose cast error nahi dega
+                holdername: receiverUsername,
                 phone: "NA",
                 branch: "NA",
                 deposit_amount: Number(amount),
-                deposit_by: `UPI from ${sender.name} (${senderUpiId})`
+                deposit_by: `UPI to ${receiverUpiId} (From: ${sender.name} - ${senderUpiId})`
             });
 
             await creditEntry.save();
@@ -919,9 +920,8 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         }
 
         // ==========================
-        // Response
+        // 5. Success Response
         // ==========================
-
         return res.status(200).json({
             msg: "UPI transfer completed successfully!",
             transaction: {
@@ -942,14 +942,12 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         });
 
     } catch (error) {
-
         console.error("Error from UPI transfer:", error);
 
         return res.status(500).json({
             msg: "Server Error",
             error: error.message
         });
-
     }
 });
 
@@ -1089,10 +1087,10 @@ AppRouter.get('/all-txn', fetchProfileConsumer, async (req, res) => {
             desc: t.deposit_by || 'Transaction'
         }));
 
-        res.json({ 
-            msg: "All transactions", 
-            total: data.length, 
-            data 
+        res.json({
+            msg: "All transactions",
+            total: data.length,
+            data
         });
 
     } catch (error) {
