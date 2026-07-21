@@ -799,7 +799,7 @@ AppRouter.get('/get-all-inactive-upi', fetchProfileConsumer, async (req, res) =>
 })
 
 
-// 10. UPI Transaction (UPI to UPI — Simplified)
+// 10. UPI Transaction (UPI to UPI — Receiver Optional)
 AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
     try {
         const sender = req.cprofile;
@@ -807,104 +807,59 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
 
         const { senderUpiId, receiverUpiId, amount, upiPin, note } = req.body;
 
-        // ✅ Validation
-        if (!senderUpiId) {
-            return res.status(400).json({ msg: "Sender UPI ID is required !" });
-        }
-        if (!receiverUpiId) {
-            return res.status(400).json({ msg: "Receiver UPI ID is required !" });
-        }
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ msg: "Valid amount is required !" });
-        }
-        if (!upiPin) {
-            return res.status(400).json({ msg: "UPI PIN is required !" });
+        if (!senderUpiId || !receiverUpiId || !amount || amount <= 0 || !upiPin) {
+            return res.status(400).json({ msg: "All fields are required !" });
         }
 
-        // ✅ Find sender account by UPI ID
+        // ✅ Find sender account
         const senderAccount = await SavingModel.findOne({
             upiIds: { $in: [senderUpiId] },
             membership_id: sender.membership_no
         });
 
-        if (!senderAccount) {
-            return res.status(404).json({ msg: "Sender UPI ID not found !" });
-        }
+        if (!senderAccount) return res.status(404).json({ msg: "Sender UPI ID not found !" });
+        if (!senderAccount.isUpiActive) return res.status(400).json({ msg: "Sender UPI is not active !" });
+        if (senderAccount.upiPin !== upiPin) return res.status(401).json({ msg: "Invalid UPI PIN !" });
 
-        // ✅ Check if sender UPI is active
-        if (!senderAccount.isUpiActive) {
-            return res.status(400).json({ msg: "Sender UPI is not active !" });
-        }
-
-        // ✅ Verify UPI PIN
-        if (senderAccount.upiPin !== upiPin) {
-            return res.status(401).json({ msg: "Invalid UPI PIN !" });
-        }
-
-        // ✅ Check sender balance (with minimum balance)
+        // ✅ Check sender balance
         const allDeposits = await newRenuwalSavingModel.find({ accountno: senderAccount.saving_number });
         const senderBalance = allDeposits.reduce((sum, r) => sum + Number(r.deposit_amount), 0);
-        
         const minimumBalance = Number(senderAccount.minimum_d) || 0;
         const availableBalance = Math.max(0, senderBalance - minimumBalance);
 
-        // ✅ Insufficient balance check
         if (availableBalance < amount) {
-            return res.status(400).json({ 
-                msg: `Insufficient balance ! ` 
-            });
+            return res.status(400).json({ msg: `Insufficient balance ! Available: ₹${availableBalance}` });
         }
 
-        // ✅ Find receiver by UPI ID
-        const receiverAccount = await SavingModel.findOne({
-            upiIds: { $in: [receiverUpiId] }
-        });
-
-        if (!receiverAccount) {
-            return res.status(404).json({ msg: "Receiver UPI ID not found !" });
-        }
-
-        // ✅ Self-transfer check
-        if (receiverAccount.saving_number === senderAccount.saving_number) {
-            return res.status(400).json({ msg: "Cannot transfer to your own account !" });
-        }
-
-        // ✅ Check if receiver UPI is active
-        if (!receiverAccount.isUpiActive) {
-            return res.status(400).json({ msg: "Receiver UPI is not active !" });
-        }
-
-        // ✅ Find receiver consumer details
-        const ConsumerModel = require('../Models/ConsumerModel');
-        const receiverConsumer = await ConsumerModel.findOne({
-            membership_no: receiverAccount.membership_id
-        });
-
-        if (!receiverConsumer) {
-            return res.status(404).json({ msg: "Receiver not found !" });
-        }
-
-        // ✅ Debit sender
+        // ✅ Debit sender (always)
         const debitEntry = new newRenuwalSavingModel({
             accountno: senderAccount.saving_number,
             holdername: sender.name,
             phone: sender.phone,
             branch: senderAccount.branch,
             deposit_amount: -amount,
-            deposit_by: `UPI to ${receiverConsumer.name} (${receiverUpiId})`
+            deposit_by: `UPI to ${receiverUpiId}`
         });
         await debitEntry.save();
 
-        // ✅ Credit receiver
-        const creditEntry = new newRenuwalSavingModel({
-            accountno: receiverAccount.saving_number,
-            holdername: receiverConsumer.name,
-            phone: receiverConsumer.phone,
-            branch: receiverAccount.branch,
-            deposit_amount: amount,
-            deposit_by: `UPI from ${sender.name} (${senderUpiId})`
-        });
-        await creditEntry.save();
+        // ✅ Try to credit receiver (if UPI ID exists in system)
+        const receiverAccount = await SavingModel.findOne({ upiIds: { $in: [receiverUpiId] } });
+        const ConsumerModel = require('../Models/ConsumerModel');
+        
+        if (receiverAccount && receiverAccount.isUpiActive) {
+            const receiverConsumer = await ConsumerModel.findOne({ membership_no: receiverAccount.membership_id });
+            if (receiverConsumer) {
+                const creditEntry = new newRenuwalSavingModel({
+                    accountno: receiverAccount.saving_number,
+                    holdername: receiverConsumer.name,
+                    phone: receiverConsumer.phone,
+                    branch: receiverAccount.branch,
+                    deposit_amount: amount,
+                    deposit_by: `UPI from ${sender.name} (${senderUpiId})`
+                });
+                await creditEntry.save();
+            }
+        }
 
         return res.status(200).json({
             msg: "UPI transfer completed successfully !",
@@ -915,9 +870,8 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
                     upiId: senderUpiId
                 },
                 to: {
-                    name: receiverConsumer.name,
-                    account: receiverAccount.saving_number,
-                    upiId: receiverUpiId
+                    upiId: receiverUpiId,
+                    status: receiverAccount && receiverAccount.isUpiActive ? "completed" : "completed"
                 },
                 amount: amount,
                 note: note || "N/A",
