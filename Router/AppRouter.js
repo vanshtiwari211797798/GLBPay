@@ -1093,6 +1093,7 @@ AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
 
 
 //17. All Transactions by Consumer (Logged-in Consumer)
+//17. All Transactions by Consumer (Logged-in Consumer)
 AppRouter.get('/all-txn', fetchProfileConsumer, async (req, res) => {
     try {
         const consumer = req.cprofile;
@@ -1109,23 +1110,51 @@ AppRouter.get('/all-txn', fetchProfileConsumer, async (req, res) => {
 
         if (!txns.length) return res.status(404).json({ msg: "No transactions" });
 
-        const data = txns.map(t => ({
-            id: t._id,
-            date: t.createdAt,
-            account: t.accountno,
-            holder: t.holdername,
-            amount: Math.abs(Number(t.deposit_amount)),
-            type: t.deposit_amount > 0 ? 'CREDIT' : 'DEBIT',
-            desc: t.deposit_by || 'Transaction'
-        }));
+        const data = txns.map(t => {
+            const isCredit = t.deposit_amount > 0;
+            const amount = Math.abs(Number(t.deposit_amount));
+            
+            let otherPartyName = '';
+            
+            if (isCredit) {
+                // CREDIT: paisa aaya, holdername mein sender ka naam hai
+                otherPartyName = t.holdername || 'Unknown';
+            } else {
+                // DEBIT: paisa gaya, deposit_by se receiver ka naam nikalo
+                if (t.deposit_by) {
+                    // Try to extract from "UPI to xxx@..."
+                    const upiMatch = t.deposit_by.match(/UPI to ([^@]+)@/);
+                    if (upiMatch) {
+                        otherPartyName = upiMatch[1];
+                    } else {
+                        // Agar UPI format nahi hai toh holdername use karo
+                        otherPartyName = t.holdername || 'Unknown';
+                    }
+                } else {
+                    otherPartyName = 'Unknown';
+                }
+            }
 
-        res.json({
-            msg: "All transactions",
-            total: data.length,
-            data
+            return {
+                id: t._id,
+                date: t.createdAt,
+                account: t.accountno,
+                name: otherPartyName,
+                amount: amount,
+                type: isCredit ? 'CREDIT' : 'DEBIT',
+                desc: isCredit ? `${otherPartyName} ne bheje` : `${otherPartyName} ko bheje`,
+                transactionType: isCredit ? 'Received' : 'Sent'
+            };
+        });
+
+        res.json({ 
+            msg: "All transactions", 
+            total: data.length, 
+            data 
         });
 
     } catch (error) {
+        console.error(`Error from all transactions: ${error}`);
         res.status(500).json({ msg: "Server Error" });
     }
 });
