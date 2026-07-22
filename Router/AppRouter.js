@@ -3,6 +3,7 @@ const AppRouter = express.Router();
 const fetchProfileConsumer = require('../Middlewares/ConsumerProfileChecker');
 const SavingModel = require('../Models/SavingModel');
 const newRenuwalSavingModel = require('../Models/RenuwalSaving');
+const LinkBankModel = require('../Models/LinkBankModel');
 
 // 1. Consumer Profile
 AppRouter.get('/consumer-profile', fetchProfileConsumer, async (req, res) => {
@@ -984,7 +985,6 @@ AppRouter.get('/get-primary-upi/:accountNumber', fetchProfileConsumer, async (re
 });
 
 
-
 //15. Get UPI PIN by Account Number
 AppRouter.get('/get-upi-pin', fetchProfileConsumer, async (req, res) => {
     try {
@@ -1158,6 +1158,167 @@ AppRouter.get('/all-txn', fetchProfileConsumer, async (req, res) => {
 });
 
 
+// 1. Add Bank
+AppRouter.post('/link-bank', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
 
+        // ✅ holder_name bhi lo
+        const { bank_name, account_no, ifsc_code, branch, holder_name } = req.body;
+
+        // ✅ holder_name bhi required
+        if (!bank_name || !account_no || !ifsc_code || !branch || !holder_name) {
+            return res.status(400).json({ msg: "All fields are required (including holder_name)" });
+        }
+
+        const existing = await LinkBankModel.findOne({ 
+            consumer_id: String(consumer.membership_no),
+            account_no: account_no 
+        });
+
+        if (existing) {
+            return res.status(400).json({ msg: "Account already linked" });
+        }
+
+        const newBank = new LinkBankModel({
+            consumer_id: String(consumer.membership_no),
+            bank_name,
+            account_no,
+            ifsc_code,
+            branch,
+            holder_name  // ✅ holder_name add karo
+        });
+
+        await newBank.save();
+
+        res.status(201).json({
+            msg: "Bank linked successfully",
+            data: newBank
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
+// 2. Get All Banks
+AppRouter.get('/link-bank/all', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
+
+        const banks = await LinkBankModel.find({ 
+            consumer_id: String(consumer.membership_no) 
+        }).sort({ createdAt: -1 });
+
+        res.json({
+            msg: "All linked banks",
+            total: banks.length,
+            data: banks
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
+// 3. Get Single Bank
+AppRouter.get('/link-bank/bank/:id', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
+
+        const bank = await LinkBankModel.findById(req.params.id);
+
+        if (!bank) {
+            return res.status(404).json({ msg: "Bank not found" });
+        }
+
+        // ✅ Type-safe comparison
+        if (String(bank.consumer_id) !== String(consumer.membership_no)) {
+            return res.status(403).json({ msg: "Unauthorized access" });
+        }
+
+        res.json({
+            msg: "Bank details",
+            data: bank
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
+// 4. Update Bank
+AppRouter.put('/link-bank/bank/:id', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
+
+        const { bank_name, account_no, ifsc_code, branch, folder_name } = req.body;
+
+        const bank = await LinkBankModel.findById(req.params.id);
+
+        if (!bank) {
+            return res.status(404).json({ msg: "Bank not found" });
+        }
+
+        // ✅ Type-safe comparison
+        if (String(bank.consumer_id) !== String(consumer.membership_no)) {
+            return res.status(403).json({ msg: "Unauthorized access" });
+        }
+
+        bank.bank_name = bank_name || bank.bank_name;
+        bank.account_no = account_no || bank.account_no;
+        bank.ifsc_code = ifsc_code || bank.ifsc_code;
+        bank.branch = branch || bank.branch;
+        bank.folder_name = folder_name || bank.folder_name;
+
+        await bank.save();
+
+        res.json({
+            msg: "Bank updated successfully",
+            data: bank
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
+// 5. Delete Bank
+AppRouter.delete('/link-bank/bank/:id', fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
+
+        const bank = await LinkBankModel.findById(req.params.id);
+
+        if (!bank) {
+            return res.status(404).json({ msg: "Bank not found" });
+        }
+
+        // ✅ Type-safe comparison
+        if (String(bank.consumer_id) !== String(consumer.membership_no)) {
+            return res.status(403).json({ msg: "Unauthorized access" });
+        }
+
+        await LinkBankModel.findByIdAndDelete(req.params.id);
+
+        res.json({
+            msg: "Bank unlinked successfully",
+            data: bank
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
 
 module.exports = AppRouter;
