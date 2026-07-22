@@ -898,10 +898,10 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         } else {
             // Outside GLBPay User
             const receiverUsername = receiverUpiId.split("@")[0];
-            
+
             // Username me se string ko number me parse kar rahe hain
             const parsedAccountNo = parseInt(receiverUsername, 10);
-            
+
             // Agar parse hue number valid hain to wo, varna default 0 safe-side ke liye
             const safeAccountNo = !isNaN(parsedAccountNo) ? parsedAccountNo : 0;
 
@@ -1024,6 +1024,7 @@ AppRouter.get('/get-upi-pin', fetchProfileConsumer, async (req, res) => {
 
 
 //16. Recent 12 Transactions
+//16. Recent 12 Transactions
 AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
     try {
         const consumer = req.cprofile;
@@ -1037,21 +1038,45 @@ AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
         const txns = await newRenuwalSavingModel
             .find({ accountno: { $in: accNos } })
             .sort({ createdAt: -1 })
-            .limit(15);
+            .limit(12);
 
         if (!txns.length) return res.status(404).json({ msg: "No transactions" });
 
-        const data = txns.map(t => ({
-            id: t._id,
-            date: t.createdAt,
-            account: t.accountno,
-            holder: t.holdername,
-            amount: Math.abs(Number(t.deposit_amount)),
-            type: t.deposit_amount > 0 ? 'CREDIT' : 'DEBIT',
-            desc: t.deposit_by || 'Transaction'
-        }));
+        const data = txns.map(t => {
+            const isCredit = t.deposit_amount > 0;
+            const amount = Math.abs(Number(t.deposit_amount));
 
-        res.json({ msg: "Recent transactions", total: data.length, data });
+            // G Pay style: show opposite party's name
+            let otherPartyName = '';
+            let desc = '';
+
+            if (isCredit) {
+                // Received money - show sender's name
+                otherPartyName = t.sender_name || t.holdername || 'Unknown';
+                desc = `${otherPartyName} ne bheje`;
+            } else {
+                // Sent money - show receiver's name
+                otherPartyName = t.receiver_name || t.holdername || 'Unknown';
+                desc = `${otherPartyName} ko bheje`;
+            }
+
+            return {
+                id: t._id,
+                date: t.createdAt,
+                account: t.accountno,
+                name: otherPartyName, // G Pay style: opposite party
+                amount: amount,
+                type: isCredit ? 'CREDIT' : 'DEBIT',
+                desc: desc, // "XYZ ne bheje" or "XYZ ko bheje"
+                transactionType: isCredit ? 'Received' : 'Sent' // G Pay style
+            };
+        });
+
+        res.json({
+            msg: "Recent transactions",
+            total: data.length,
+            data
+        });
 
     } catch (error) {
         res.status(500).json({ msg: "Server Error" });
