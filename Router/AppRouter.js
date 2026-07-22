@@ -898,10 +898,10 @@ AppRouter.post('/upi-transfer', fetchProfileConsumer, async (req, res) => {
         } else {
             // Outside GLBPay User
             const receiverUsername = receiverUpiId.split("@")[0];
-
+            
             // Username me se string ko number me parse kar rahe hain
             const parsedAccountNo = parseInt(receiverUsername, 10);
-
+            
             // Agar parse hue number valid hain to wo, varna default 0 safe-side ke liye
             const safeAccountNo = !isNaN(parsedAccountNo) ? parsedAccountNo : 0;
 
@@ -1045,44 +1045,51 @@ AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
         const data = txns.map(t => {
             const isCredit = t.deposit_amount > 0;
             const amount = Math.abs(Number(t.deposit_amount));
-
-            // G Pay style: show opposite party's name
+            
             let otherPartyName = '';
-            let desc = '';
-
+            
             if (isCredit) {
-                // Received money - show sender's name
-                otherPartyName = t.sender_name || t.holdername || 'Unknown';
-                desc = `${otherPartyName} ne bheje`;
+                // CREDIT: paisa aaya, holdername mein sender ka naam hai
+                otherPartyName = t.holdername || 'Unknown';
             } else {
-                // Sent money - show receiver's name
-                otherPartyName = t.receiver_name || t.holdername || 'Unknown';
-                desc = `${otherPartyName} ko bheje`;
+                // DEBIT: paisa gaya, deposit_by se receiver ka naam nikalo
+                if (t.deposit_by) {
+                    // Try to extract from "UPI to xxx@..."
+                    const upiMatch = t.deposit_by.match(/UPI to ([^@]+)@/);
+                    if (upiMatch) {
+                        otherPartyName = upiMatch[1];
+                    } else {
+                        // Agar UPI format nahi hai toh holdername use karo
+                        otherPartyName = t.holdername || 'Unknown';
+                    }
+                } else {
+                    otherPartyName = 'Unknown';
+                }
             }
 
             return {
                 id: t._id,
                 date: t.createdAt,
                 account: t.accountno,
-                name: otherPartyName, // G Pay style: opposite party
+                name: otherPartyName,
                 amount: amount,
                 type: isCredit ? 'CREDIT' : 'DEBIT',
-                desc: desc, // "XYZ ne bheje" or "XYZ ko bheje"
-                transactionType: isCredit ? 'Received' : 'Sent' // G Pay style
+                desc: isCredit ? `${otherPartyName} ne bheje` : `${otherPartyName} ko bheje`,
+                transactionType: isCredit ? 'Received' : 'Sent'
             };
         });
 
-        res.json({
-            msg: "Recent transactions",
-            total: data.length,
-            data
+        res.json({ 
+            msg: "Recent transactions", 
+            total: data.length, 
+            data 
         });
 
     } catch (error) {
+        console.error(error);
         res.status(500).json({ msg: "Server Error" });
     }
 });
-
 
 
 //17. All Transactions by Consumer (Logged-in Consumer)
