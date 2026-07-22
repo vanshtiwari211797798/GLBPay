@@ -1024,7 +1024,6 @@ AppRouter.get('/get-upi-pin', fetchProfileConsumer, async (req, res) => {
 
 
 //16. Recent 12 Transactions
-//16. Recent 12 Transactions
 AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
     try {
         const consumer = req.cprofile;
@@ -1092,7 +1091,6 @@ AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
 });
 
 
-//17. All Transactions by Consumer (Logged-in Consumer)
 //17. All Transactions by Consumer (Logged-in Consumer)
 AppRouter.get('/all-txn', fetchProfileConsumer, async (req, res) => {
     try {
