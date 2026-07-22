@@ -1074,7 +1074,7 @@ AppRouter.get('/recent-txn', fetchProfileConsumer, async (req, res) => {
                 name: otherPartyName,
                 amount: amount,
                 type: isCredit ? 'CREDIT' : 'DEBIT',
-                desc: isCredit ? `${otherPartyName} ne bheje` : `${otherPartyName} ko bheje`,
+                desc: isCredit ? `${otherPartyName} Send ti ` : `${otherPartyName} `,
                 transactionType: isCredit ? 'Received' : 'Sent'
             };
         });
