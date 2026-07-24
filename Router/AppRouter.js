@@ -1164,21 +1164,23 @@ AppRouter.post('/link-bank', fetchProfileConsumer, async (req, res) => {
         const consumer = req.cprofile;
         if (!consumer) return res.status(401).json({ msg: "Unauthorized" });
 
-        // ✅ holder_name bhi lo
         const { bank_name, account_no, ifsc_code, branch, holder_name } = req.body;
 
-        // ✅ holder_name bhi required
         if (!bank_name || !account_no || !ifsc_code || !branch || !holder_name) {
             return res.status(400).json({ msg: "All fields are required (including holder_name)" });
         }
 
-        const existing = await LinkBankModel.findOne({ 
+        // ✅ Check if SAME USER has SAME BANK + SAME ACCOUNT
+        const existing = await LinkBankModel.findOne({
             consumer_id: String(consumer.membership_no),
-            account_no: account_no 
+            bank_name: bank_name,          // 🟢 Bank name bhi match karo
+            account_no: account_no
         });
 
         if (existing) {
-            return res.status(400).json({ msg: "Account already linked" });
+            return res.status(400).json({ 
+                msg: `This account number (${account_no}) is already linked with ${bank_name} for your profile` 
+            });
         }
 
         const newBank = new LinkBankModel({
@@ -1187,7 +1189,7 @@ AppRouter.post('/link-bank', fetchProfileConsumer, async (req, res) => {
             account_no,
             ifsc_code,
             branch,
-            holder_name  // ✅ holder_name add karo
+            holder_name
         });
 
         await newBank.save();
