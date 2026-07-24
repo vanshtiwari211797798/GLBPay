@@ -964,6 +964,47 @@ HomeRouter.get('/admin/external-transactions', async (req, res) => {
     }
 });
 
+// ============ GET CONSUMER TRANSACTIONS ============
+HomeRouter.get('/consumer-txn/:consumerId', async (req, res) => {
+    try {
+        const { consumerId } = req.params;
+        const { limit = 100 } = req.query;
+
+        // ✅ Consumer ke saare accounts
+        const accounts = await SavingModel.find({ membership_id: consumerId });
+        const accNos = accounts.map(a => a.saving_number);
+
+        // ✅ Transactions fetch karo
+        const txns = await newRenuwalSavingModel
+            .find({ accountno: { $in: accNos } })
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit));
+
+        // ✅ Consumer details
+        const consumer = await ConsumerModel.findOne({ membership_no: consumerId });
+
+        res.json({
+            consumer: {
+                name: consumer?.name || 'Unknown',
+                membership_no: consumerId
+            },
+            total: txns.length,
+            data: txns.map(t => ({
+                id: t._id,
+                account: t.accountno,
+                amount: Math.abs(Number(t.deposit_amount)),
+                type: t.deposit_amount > 0 ? 'CREDIT' : 'DEBIT',
+                description: t.deposit_by || 'Transaction',
+                branch: t.branch || 'N/A',
+                date: t.createdAt
+            }))
+        });
+
+    } catch (error) {
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
 module.exports = HomeRouter;
 
 
