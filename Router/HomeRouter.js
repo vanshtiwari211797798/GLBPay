@@ -928,6 +928,42 @@ HomeRouter.post('/consumer-login', async (req, res) => {
 })
 
 
+// ============ ADMIN - ONLY NA BRANCH EXTERNAL TRANSACTIONS ============
+HomeRouter.get('/admin/external-transactions', async (req, res) => {
+    try {
+        const { limit = 100 } = req.query;
+
+        // ✅ Sirf branch "NA" wali transactions
+        const transactions = await newRenuwalSavingModel
+            .find({ branch: { $regex: /^NA$/i } })
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit));
+
+        return res.status(200).json({
+            msg: "External transactions (NA branch) fetched successfully!",
+            total: transactions.length,
+            data: transactions.map(t => ({
+                id: t._id,
+                account: t.accountno,
+                holdername: t.holdername,
+                phone: t.phone,
+                amount: Math.abs(Number(t.deposit_amount)),
+                type: t.deposit_amount > 0 ? 'CREDIT' : 'DEBIT',
+                description: t.deposit_by || 'External Transaction',
+                branch: t.branch || 'N/A',
+                date: t.createdAt
+            }))
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ 
+            msg: "Server Error", 
+            error: error.message 
+        });
+    }
+});
+
 module.exports = HomeRouter;
 
 
