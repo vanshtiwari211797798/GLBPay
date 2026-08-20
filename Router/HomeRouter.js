@@ -908,51 +908,32 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
 
 
 //login the consumer by the consumer id and password
-HomeRouter.post("/consumer-login", async (req, res) => {
+HomeRouter.post('/consumer-login', async (req, res) => {
     try {
         const { consumerid, password } = req.body;
 
         if (!consumerid || !password) {
-            return res.status(401).json({ msg: "All fields is required !" });
+            return res.status(401).json({ msg: 'All fields is required !' })
         }
 
-        const getConsumer = await ConsumerModel.findOne({
-            membership_no: consumerid,
-        });
+        const getConsumer = await ConsumerModel.findOne({ membership_no: consumerid });
 
         if (!getConsumer) {
-            return res.status(404).json({ msg: "Invalid Credentials" });
+            return res.status(404).json({ msg: "Invalid Creadential" })
         }
 
-        // ✅ Hash password compare
-        const isMatch = await bcryptjs.compare(password, getConsumer.password);
-
-        if (!isMatch) {
-            return res.status(401).json({ msg: "Invalid Credentials" });
+        if (getConsumer.password !== password) {
+            return res.status(401).json({ msg: "Invalid Creadentials" })
         }
 
-        const newToken = jwt.sign({ email: getConsumer.email }, SECRET_KEY, {
-            expiresIn: "365d",
-        });
+        const newToken = jwt.sign({ email: getConsumer.email }, SECRET_KEY, { expiresIn: "365d" });
 
-        // ✅ YEH ADD KARO — DATA BHEJO
-        return res.status(201).json({
-            msg: "Consumer Login Successfully !",
-            token: newToken,
-            data: {
-                _id: getConsumer._id,
-                name: getConsumer.name,
-                membership_no: getConsumer.membership_no,
-                phone: getConsumer.phone,
-                email: getConsumer.email,
-                photo: getConsumer.photo
-            }
-        });
+        return res.status(201).json({ msg: "Consumer Login Successfully !", token: newToken });
+
     } catch (error) {
-        console.error(`Error from the consumer login api and error is ${error}`);
-        return res.status(500).json({ msg: "Server Error" });
+        console.error(`Error from the consumer login api and error is the ${error}`)
     }
-});
+})
 
 
 // ✅ Fetch logged-in consumer's UPI active accounts only
