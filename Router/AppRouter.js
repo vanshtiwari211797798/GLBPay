@@ -11,7 +11,8 @@ AppRouter.get('/consumer-profile', fetchProfileConsumer, async (req, res) => {
         const data = req.cprofile;
         return res.status(200).json({ msg: "Hello app api", data: data });
     } catch (error) {
-        console.error(`Error from fetching consumer profile ${error}`)
+        console.error(`Error from fetching consumer profile ${error}`);
+        return res.status(500).json({ msg: "Server Error", error: error.message });
     }
 });
 
@@ -1322,5 +1323,7 @@ AppRouter.delete('/link-bank/bank/:id', fetchProfileConsumer, async (req, res) =
         res.status(500).json({ msg: "Server Error" });
     }
 });
+
+
 
 module.exports = AppRouter;

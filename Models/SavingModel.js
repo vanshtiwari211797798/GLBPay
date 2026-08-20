@@ -99,6 +99,10 @@ const SavingSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    agent_code: {
+        type: String,
+        default: null
+    },
     a_name: {
         type: String,
         required: true
@@ -112,17 +116,17 @@ const SavingSchema = new mongoose.Schema({
         required: true
     },
     upiIds: {
-    type: [String],  // Array of 3 UPI IDs
-    default: []
-},
-upiPin: {
-    type: String,    // Hashed 4-digit PIN
-    default: null
-},
-isUpiActive: {
-    type: Boolean,
-    default: false
-}
+        type: [String],  // Array of 3 UPI IDs
+        default: []
+    },
+    upiPin: {
+        type: String,    // Hashed 4-digit PIN
+        default: null
+    },
+    isUpiActive: {
+        type: Boolean,
+        default: false
+    }
 }, {
     timestamps: true
 })

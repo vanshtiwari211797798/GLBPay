@@ -11,7 +11,8 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 const SavingModel = require('../Models/SavingModel');
 const AgentModel = require('../Models/AgentModel');
-const newRenuwalSavingModel = require('../Models/RenuwalSaving')
+const newRenuwalSavingModel = require('../Models/RenuwalSaving');
+const fetchProfileConsumer = require("../Middlewares/ConsumerProfileChecker");
 
 
 //consumer image upload route
@@ -258,149 +259,130 @@ HomeRouter.get('/get-consumers', async (_, res) => {
 })
 
 
-//open saving account 
-HomeRouter.post('/open-saving-account', async (req, res) => {
+//open saving account
+HomeRouter.post("/open-saving-account", async (req, res) => {
     try {
-
         const {
-            branch, membership_id, account_holder, father_husband, dob, gender,
-            merital, occupation, phone, email, city, state, pincode, address,
-            aadhar, pan, voter, initital_d, minimum_d, interest, opening_date,
-            nominee_name, relation, n_dob, n_contact, a_name, a_code
-        } = req.body;
-
-
-        if (
-            !branch || !membership_id || !account_holder ||
-            !father_husband || !dob || !gender || !merital ||
-            !occupation || !phone || !email || !city ||
-            !state || !pincode || !address || !aadhar ||
-            !pan || !voter || !initital_d || !minimum_d ||
-            !interest || !opening_date || !nominee_name ||
-            !relation || !n_dob || !n_contact ||
-            !a_name || !a_code
-        ) {
-
-            return res.status(401).json({
-                msg: "All fields is required"
-            });
-
-        }
-
-
-        // check membership valid
-
-        const check_member = await ConsumerModel.findOne({
-            membership_no: membership_id
-        });
-
-
-        if (!check_member) {
-
-            return res.status(404).json({
-                msg: "Invalid Consumer ID"
-            });
-
-        }
-
-
-
-        // Generate Unique Saving Number
-
-        let saving_number;
-
-
-        do {
-
-            saving_number =
-                Math.floor(1000000 + Math.random() * 9000000);
-
-
-        } while (
-            await SavingModel.findOne({ saving_number })
-        );
-
-
-
-        // Insert Saving Account
-
-
-        const newSaving = new SavingModel({
-
-            saving_number,
-
             branch,
             membership_id,
-
             account_holder,
             father_husband,
-
             dob,
             gender,
             merital,
-
             occupation,
-
             phone,
             email,
-
             city,
             state,
             pincode,
-
             address,
-
             aadhar,
             pan,
             voter,
-
-
             initital_d,
             minimum_d,
             interest,
-
             opening_date,
-
-
             nominee_name,
             relation,
             n_dob,
             n_contact,
-
-
             a_name,
-            a_code
+            a_code,
+            agent_code,
+        } = req.body;
 
+        // ✅ Required fields check
+        if (
+            !branch ||
+            !membership_id ||
+            !account_holder ||
+            !father_husband ||
+            !dob ||
+            !gender ||
+            !merital ||
+            !occupation ||
+            !phone ||
+            !email ||
+            !city ||
+            !state ||
+            !pincode ||
+            !address ||
+            !aadhar ||
+            !voter ||
+            !initital_d ||
+            !minimum_d ||
+            !interest ||
+            !opening_date ||
+            !nominee_name ||
+            !relation ||
+            !n_dob ||
+            !n_contact ||
+            !a_name ||
+            !a_code
+        ) {
+            return res.status(401).json({ msg: "All fields are required" });
+        }
+
+        // ✅ Check membership
+        const check_member = await ConsumerModel.findOne({
+            membership_no: membership_id,
         });
+        if (!check_member)
+            return res.status(404).json({ msg: "Invalid Consumer ID" });
 
+        // ✅ Generate saving number
+        let saving_number;
+        do {
+            saving_number = Math.floor(1000000 + Math.random() * 9000000);
+        } while (await SavingModel.findOne({ saving_number }));
+
+        // ✅ Save account
+        const newSaving = new SavingModel({
+            saving_number,
+            branch,
+            membership_id,
+            account_holder,
+            father_husband,
+            dob,
+            gender,
+            merital,
+            occupation,
+            phone,
+            email,
+            city,
+            state,
+            pincode,
+            address,
+            aadhar,
+            pan,
+            voter,
+            initital_d,
+            minimum_d,
+            interest,
+            opening_date,
+            nominee_name,
+            relation,
+            n_dob,
+            n_contact,
+            a_name,
+            a_code,
+            agent_code: agent_code || null, // ✅ agent_code save
+        });
 
         await newSaving.save();
 
-
-
         return res.status(201).json({
-
             msg: "Saving Account Open Successfully",
-
-            saving_number: saving_number,
-
-            data: newSaving
-
+            saving_number,
+            data: newSaving,
         });
-
-
-
     } catch (error) {
-
         console.log(error);
-
-        return res.status(500).json({
-            msg: "Server Error"
-        });
-
+        return res.status(500).json({ msg: "Server Error" });
     }
 });
-
 
 //fetch all saving accounts
 HomeRouter.get('/all-saving-account', async (_, res) => {
@@ -565,23 +547,49 @@ HomeRouter.get('/fetch-accounts/:accountno', async (req, res) => {
 
 
 // deposit saving account balence updated
-HomeRouter.post('/renuwal-saving', async (req, res) => {
+HomeRouter.post("/renuwal-saving", async (req, res) => {
     try {
-        const { accountno, holdername, phone, branch, deposit_amount, deposit_by } = req.body;
+        const {
+            accountno,
+            holdername,
+            phone,
+            branch,
+            deposit_amount,
+            deposit_by,
+            agent_code,
+            a_code,
+        } = req.body; // ✅ agent_code + a_code dono add karo
 
-        if (!accountno || !holdername || !phone || !branch || !deposit_amount || !deposit_by) {
+        if (
+            !accountno ||
+            !holdername ||
+            !phone ||
+            !branch ||
+            !deposit_amount ||
+            !deposit_by
+        ) {
             return res.status(401).json({ msg: "All fields is required !" });
         }
 
-        const newRenuwalSaving = new newRenuwalSavingModel({ accountno, holdername, phone, branch, deposit_amount, deposit_by });
+        const newRenuwalSaving = new newRenuwalSavingModel({
+            accountno,
+            holdername,
+            phone,
+            branch,
+            deposit_amount,
+            deposit_by,
+            agent_code: agent_code || null, // ✅ agent_code save
+            a_code: a_code || null, // ✅ a_code save
+        });
         await newRenuwalSaving.save();
 
-        return res.status(201).json({ msg: 'Renuwal Saving Successfully!' });
-
+        return res.status(201).json({ msg: "Renuwal Saving Successfully!" });
     } catch (error) {
-        console.error(`Error from renuwal saving accounts and error is the ${error}`)
+        console.error(
+            `Error from renuwal saving accounts and error is the ${error}`,
+        );
     }
-})
+});
 
 //fetch all renuwal list add
 HomeRouter.get('/fetch-all-renuwal-list', async (_, res) => {
@@ -899,34 +907,144 @@ HomeRouter.delete('/delete-renuwal-saving/:id', async (req, res) => {
 })
 
 
-//login the conuser by the consumer id and password 
-HomeRouter.post('/consumer-login', async (req, res) => {
+//login the consumer by the consumer id and password
+HomeRouter.post("/consumer-login", async (req, res) => {
     try {
         const { consumerid, password } = req.body;
 
         if (!consumerid || !password) {
-            return res.status(401).json({ msg: 'All fields is required !' })
+            return res.status(401).json({ msg: "All fields is required !" });
         }
 
-        const getConsumer = await ConsumerModel.findOne({ membership_no: consumerid });
+        const getConsumer = await ConsumerModel.findOne({
+            membership_no: consumerid,
+        });
 
         if (!getConsumer) {
-            return res.status(404).json({ msg: "Invalid Creadential" })
+            return res.status(404).json({ msg: "Invalid Credentials" });
         }
 
-        if (getConsumer.password !== password) {
-            return res.status(401).json({ msg: "Invalid Creadentials" })
+        // ✅ Hash password compare
+        const isMatch = await bcryptjs.compare(password, getConsumer.password);
+
+        if (!isMatch) {
+            return res.status(401).json({ msg: "Invalid Credentials" });
         }
 
-        const newToken = jwt.sign({ email: getConsumer.email }, SECRET_KEY, { expiresIn: "365d" });
+        const newToken = jwt.sign({ email: getConsumer.email }, SECRET_KEY, {
+            expiresIn: "365d",
+        });
 
-        return res.status(201).json({ msg: "Consumer Login Successfully !", token: newToken });
-
+        // ✅ YEH ADD KARO — DATA BHEJO
+        return res.status(201).json({
+            msg: "Consumer Login Successfully !",
+            token: newToken,
+            data: {
+                _id: getConsumer._id,
+                name: getConsumer.name,
+                membership_no: getConsumer.membership_no,
+                phone: getConsumer.phone,
+                email: getConsumer.email,
+                photo: getConsumer.photo
+            }
+        });
     } catch (error) {
-        console.error(`Error from the consumer login api and error is the ${error}`)
+        console.error(`Error from the consumer login api and error is ${error}`);
+        return res.status(500).json({ msg: "Server Error" });
     }
-})
+});
 
+
+// ✅ Fetch logged-in consumer's UPI active accounts only
+HomeRouter.get(
+    "/my-upi-active-accounts",
+    fetchProfileConsumer,
+    async (req, res) => {
+        try {
+            const consumer = req.cprofile;
+            if (!consumer) {
+                return res.status(401).json({ msg: "Unauthorized access" });
+            }
+
+            // ✅ Sirf logged-in consumer ke accounts
+            const activeUpiAccounts = await SavingModel.find({
+                membership_id: consumer.membership_no,
+                isUpiActive: true,
+            }).select("saving_number account_holder phone upiIds isUpiActive branch");
+
+            if (!activeUpiAccounts || activeUpiAccounts.length === 0) {
+                return res.status(404).json({
+                    msg: "No active UPI accounts found for this consumer",
+                });
+            }
+
+            return res.status(200).json({
+                msg: "Your UPI active accounts fetched successfully !",
+                count: activeUpiAccounts.length,
+                data: activeUpiAccounts,
+            });
+        } catch (error) {
+            console.error(
+                `Error from fetching consumer UPI active accounts: ${error}`,
+            );
+            return res.status(500).json({
+                msg: "Server error",
+                error: error.message,
+            });
+        }
+    },
+);
+
+// ✅ Fetch all accounts where UPI is NOT ACTIVE (account level)
+HomeRouter.get("/upi-inactive-accounts", async (_, res) => {
+    try {
+        const inactiveUpiAccounts = await SavingModel.find({
+            isUpiActive: false,
+        }).select(
+            "saving_number account_holder phone upiIds isUpiActive membership_id branch",
+        );
+
+        if (!inactiveUpiAccounts || inactiveUpiAccounts.length === 0) {
+            return res.status(404).json({
+                msg: "No accounts with inactive UPI found",
+            });
+        }
+
+        // ✅ Fetch consumer details for each account
+        const ConsumerModel = require("../Models/ConsumerModel");
+        const accountsWithConsumer = await Promise.all(
+            inactiveUpiAccounts.map(async (account) => {
+                const consumer = await ConsumerModel.findOne({
+                    membership_no: account.membership_id,
+                }).select("name phone email photo membership_no");
+
+                return {
+                    account: {
+                        saving_number: account.saving_number,
+                        account_holder: account.account_holder,
+                        phone: account.phone,
+                        branch: account.branch,
+                        upiIds: account.upiIds || [],
+                        isUpiActive: account.isUpiActive,
+                    },
+                    consumer: consumer || null,
+                };
+            }),
+        );
+
+        return res.status(200).json({
+            msg: "UPI inactive accounts fetched successfully !",
+            count: accountsWithConsumer.length,
+            data: accountsWithConsumer,
+        });
+    } catch (error) {
+        console.error(`Error from fetching UPI inactive accounts: ${error}`);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message,
+        });
+    }
+});
 
 // ============ ADMIN - ONLY NA BRANCH EXTERNAL TRANSACTIONS ============
 HomeRouter.get('/admin/external-transactions', async (req, res) => {
@@ -957,22 +1075,22 @@ HomeRouter.get('/admin/external-transactions', async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ 
-            msg: "Server Error", 
-            error: error.message 
+        res.status(500).json({
+            msg: "Server Error",
+            error: error.message
         });
     }
 });
 
 // ============ GET CONSUMER TRANSACTIONS ============
-HomeRouter.get('/consumer-txn/:consumerId', async (req, res) => {
+HomeRouter.get("/consumer-txn/:consumerId", async (req, res) => {
     try {
         const { consumerId } = req.params;
         const { limit = 100 } = req.query;
 
         // ✅ Consumer ke saare accounts
         const accounts = await SavingModel.find({ membership_id: consumerId });
-        const accNos = accounts.map(a => a.saving_number);
+        const accNos = accounts.map((a) => a.saving_number);
 
         // ✅ Transactions fetch karo
         const txns = await newRenuwalSavingModel
@@ -985,25 +1103,316 @@ HomeRouter.get('/consumer-txn/:consumerId', async (req, res) => {
 
         res.json({
             consumer: {
-                name: consumer?.name || 'Unknown',
-                membership_no: consumerId
+                name: consumer?.name || "Unknown",
+                membership_no: consumerId,
             },
             total: txns.length,
-            data: txns.map(t => ({
+            data: txns.map((t) => ({
                 id: t._id,
                 account: t.accountno,
                 amount: Math.abs(Number(t.deposit_amount)),
-                type: t.deposit_amount > 0 ? 'CREDIT' : 'DEBIT',
-                description: t.deposit_by || 'Transaction',
-                branch: t.branch || 'N/A',
-                date: t.createdAt
-            }))
+                type: t.deposit_amount > 0 ? "CREDIT" : "DEBIT",
+                description: t.deposit_by || "Transaction",
+                branch: t.branch || "N/A",
+                date: t.createdAt,
+            })),
         });
-
     } catch (error) {
         res.status(500).json({ msg: "Server Error" });
     }
 });
+
+
+// ============ AGENT LOGIN ============
+HomeRouter.post("/agent-login", async (req, res) => {
+    try {
+        const { agentcode, password } = req.body;
+        if (!agentcode || !password)
+            return res.status(400).json({ msg: "All fields required" });
+
+        const agent = await AgentModel.findOne({ agentcode });
+        if (!agent) return res.status(404).json({ msg: "Invalid agent code" });
+        if (agent.password !== password)
+            return res.status(401).json({ msg: "Invalid password" });
+
+        const token = jwt.sign(
+            { agentcode: agent.agentcode, name: agent.name },
+            SECRET_KEY,
+            { expiresIn: "7d" },
+        );
+
+        res.json({
+            msg: "Login successful",
+            token,
+            data: {
+                name: agent.name,
+                agentcode: agent.agentcode,
+                phone: agent.phone,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ msg: "Server error" });
+    }
+});
+
+// ============ AGENT DASHBOARD ============
+HomeRouter.get("/agent-dashboard", async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ msg: "Unauthorized" });
+
+        const decoded = jwt.verify(token, SECRET_KEY);
+        const agentCode = decoded.agentcode; // ✅ Number hai (5217891313)
+
+        console.log("🔑 Agent Code from token:", agentCode);
+        console.log("🔑 Agent Code type:", typeof agentCode);
+
+        // ✅ `a_code` number hai, isliye parseInt nahi karna
+        const totalAccounts = await SavingModel.countDocuments({
+            $or: [
+                { agent_code: String(agentCode) },
+                { a_code: agentCode }, // ✅ Number ke saath direct compare
+            ],
+        });
+
+        console.log("📊 Total Accounts:", totalAccounts);
+
+        const totalRenewals = await newRenuwalSavingModel.countDocuments({
+            $or: [{ agent_code: String(agentCode) }, { a_code: agentCode }],
+        });
+
+        const renewals = await newRenuwalSavingModel.find({
+            $or: [{ agent_code: String(agentCode) }, { a_code: agentCode }],
+        });
+
+        const totalDeposit = renewals.reduce(
+            (sum, r) => sum + Number(r.deposit_amount),
+            0,
+        );
+
+        res.json({
+            msg: "Dashboard data",
+            data: { totalAccounts, totalRenewals, totalDeposit },
+        });
+    } catch (error) {
+        console.error("Dashboard error:", error);
+        res.status(500).json({ msg: "Server error" });
+    }
+});
+
+// ============ AGENT ACCOUNT LIST ============
+HomeRouter.get("/agent-accounts", async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ msg: "Unauthorized" });
+
+        const decoded = jwt.verify(token, SECRET_KEY);
+        const agentCode = decoded.agentcode;
+
+        const accounts = await SavingModel.find({
+            $or: [{ agent_code: String(agentCode) }, { a_code: parseInt(agentCode) }],
+        }).sort({ createdAt: -1 });
+
+        res.json({
+            msg: "Accounts fetched",
+            total: accounts.length,
+            data: accounts,
+        });
+    } catch (error) {
+        res.status(500).json({ msg: "Server error" });
+    }
+});
+
+// ============ AGENT RENEWAL LIST ============
+HomeRouter.get("/agent-renewals", async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ msg: "Unauthorized" });
+
+        const decoded = jwt.verify(token, SECRET_KEY);
+        const agentCode = decoded.agentcode;
+
+        const renewals = await newRenuwalSavingModel
+            .find({
+                $or: [
+                    { agent_code: String(agentCode) },
+                    { a_code: parseInt(agentCode) },
+                ],
+            })
+            .sort({ createdAt: -1 });
+
+        const totalDeposit = renewals.reduce(
+            (sum, r) => sum + Number(r.deposit_amount),
+            0,
+        );
+
+        res.json({
+            msg: "Renewals fetched",
+            total: renewals.length,
+            totalDeposit,
+            data: renewals,
+        });
+    } catch (error) {
+        res.status(500).json({ msg: "Server error" });
+    }
+});
+
+// ============ ACCOUNT STATEMENT ============
+HomeRouter.get("/statement/:account", async (req, res) => {
+    try {
+        const { account } = req.params;
+        const { filter } = req.query;
+
+        // ✅ Account details
+        const acc = await SavingModel.findOne({ saving_number: parseInt(account) });
+        if (!acc) return res.status(404).json({ msg: "Account not found" });
+
+        console.log("ACCOUNT DATA:", {
+            phone: acc.phone,
+            email: acc.email,
+            address: acc.address,
+            city: acc.city,
+            state: acc.state,
+            pincode: acc.pincode,
+        });
+
+        // ✅ Date filter
+        const now = new Date();
+        let start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        let end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        if (filter === "current_month") {
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        } else if (filter === "prev_month") {
+            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            end = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else if (filter === "current_year") {
+            start = new Date(now.getFullYear(), 0, 1);
+            end = new Date(now.getFullYear(), 11, 31);
+        }
+
+        // ✅ Transactions fetch
+        const txns = await newRenuwalSavingModel
+            .find({
+                accountno: parseInt(account),
+                createdAt: { $gte: start, $lte: end },
+            })
+            .sort({ createdAt: 1 });
+
+        // ✅ Summary
+        let balance = Number(acc.initital_d) || 0;
+        let credits = 0,
+            debits = 0;
+
+        const data = txns.map((t) => {
+            const amt = Number(t.deposit_amount);
+            balance += amt;
+            if (amt > 0) credits += amt;
+            else debits += Math.abs(amt);
+            return {
+                date: t.createdAt,
+                particulars: t.deposit_by || "Transaction",
+                ref: t._id.toString().slice(-6),
+                withdrawal: amt < 0 ? Math.abs(amt) : 0,
+                deposit: amt > 0 ? amt : 0,
+                balance,
+            };
+        });
+
+        res.json({
+            account: {
+                number: acc.saving_number,
+                holder: acc.account_holder,
+                branch: acc.branch,
+                address: acc.address || "",
+                city: acc.city || "",
+                state: acc.state || "",
+                pincode: acc.pincode || "",
+                phone: acc.phone || "",
+                email: acc.email || "",
+            },
+            summary: {
+                opening: Number(acc.initital_d) || 0,
+                credits,
+                debits,
+                closing: balance,
+            },
+            transactions: data,
+        });
+    } catch (error) {
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
+// ============ CONSUMER ACCOUNT LIST (Logged-in Consumer) ============
+HomeRouter.get("/my-accounts", fetchProfileConsumer, async (req, res) => {
+    try {
+        const consumer = req.cprofile;
+        if (!consumer) {
+            return res.status(401).json({ msg: "Unauthorized access" });
+        }
+
+        // ✅ Sirf logged-in consumer ke accounts
+        const accounts = await SavingModel.find({
+            membership_id: consumer.membership_no,
+        }).sort({ createdAt: -1 });
+
+        if (!accounts || accounts.length === 0) {
+            return res.status(404).json({
+                msg: "No accounts found for this consumer",
+            });
+        }
+
+        return res.status(200).json({
+            msg: "Consumer accounts fetched successfully!",
+            total: accounts.length,
+            data: accounts,
+        });
+    } catch (error) {
+        console.error(`Error from fetching consumer accounts: ${error}`);
+        return res.status(500).json({
+            msg: "Server error",
+            error: error.message,
+        });
+    }
+});
+
+// ============ ADMIN - ONLY NA BRANCH EXTERNAL TRANSACTIONS ============
+HomeRouter.get("/admin/external-transactions", async (req, res) => {
+    try {
+        const { limit = 100 } = req.query;
+
+        // ✅ Sirf branch "NA" wali transactions
+        const transactions = await newRenuwalSavingModel
+            .find({ branch: { $regex: /^NA$/i } })
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit));
+
+        return res.status(200).json({
+            msg: "External transactions (NA branch) fetched successfully!",
+            total: transactions.length,
+            data: transactions.map((t) => ({
+                id: t._id,
+                account: t.accountno,
+                holdername: t.holdername,
+                phone: t.phone,
+                amount: Math.abs(Number(t.deposit_amount)),
+                type: t.deposit_amount > 0 ? "CREDIT" : "DEBIT",
+                description: t.deposit_by || "External Transaction",
+                branch: t.branch || "N/A",
+                date: t.createdAt,
+            })),
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            msg: "Server Error",
+            error: error.message,
+        });
+    }
+});
+
 
 module.exports = HomeRouter;
 

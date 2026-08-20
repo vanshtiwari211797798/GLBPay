@@ -21,6 +21,14 @@ const RenuwalSavingSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    a_code: {
+        type: Number,
+        default: null
+    },
+    agent_code: {
+        type: String,
+        default: null
+    },
     deposit_by: {
         type: String,
         required: true
